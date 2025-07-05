@@ -1,3 +1,13 @@
+---
+title: Prediksi Penyakit Jantung
+emoji: 🩺
+colorFrom: indigo
+colorTo: purple
+sdk: gradio
+app_file: app.py
+pinned: false
+---
+
 # 🩺 Prediksi Penyakit Jantung - Proyek MLOps
 
 Proyek ini bertujuan untuk membangun sistem prediksi penyakit jantung menggunakan model machine learning dan menerapkan praktik MLOps untuk otomatisasi, mulai dari pelatihan model hingga deployment aplikasi web interaktif.
