@@ -1,0 +1,12 @@
+# Folder model yang berisi artefak
+model/
+
+# Folder virtual environment
+venv/
+.venv/
+
+# Folder cache Python
+__pycache__/
+
+# File spesifik sistem operasi
+.DS_Store
