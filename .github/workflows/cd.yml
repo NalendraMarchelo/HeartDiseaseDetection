@@ -1,17 +1,19 @@
-# .github/workflows/main.yml (Versi Revisi Final - Menggunakan Git Push)
+# melakukan deployment ke Hugging Face
+name: Continuous Deployment
 
-name: Deploy to Hugging Face Space
-
+# Pemicu
 on:
   push:
     branches:
       - main
 
 jobs:
-  deploy-to-hub:
+  deploy-to-hugging-face:
+    name: Deploy to Hugging Face Space
     runs-on: ubuntu-latest
+
     steps:
-      # Langkah 1: Checkout kode dari repositori GitHub
+      # Langkah 1: Checkout kode dari repositori
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -24,9 +26,5 @@ jobs:
         run: |
           git config --global user.email "hf@actions"
           git config --global user.name "Hugging Face Actions Bot"
-
-          # Token HF_TOKEN digunakan untuk login
           git remote add space https://NalendraMarchelo:${HF_TOKEN}@huggingface.co/spaces/NalendraMarchelo/Heart-Disease-Prediction
-
-          # Lakukan push secara paksa ke branch 'main' di remote 'space'
           git push --force space main
