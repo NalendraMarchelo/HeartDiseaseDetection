@@ -3,30 +3,24 @@
 # 225150200111005_3 NARENDRA ATHA ABHINAYA_3
 # 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
 
-# Mengabaikan semua isi dari folder 'model' yang berisi file .joblib
 model/
 
-# Folder Virtual Environment
 venv/
 .venv/
 env/
 .env
 
-# File Cache dan Kompilasi Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Folder Checkpoint Jupyter Notebook
 .ipynb_checkpoints/
 
-# File spesifik IDE/Editor Teks
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
 
-# File spesifik Sistem Operasi
 .DS_Store
 Thumbs.db

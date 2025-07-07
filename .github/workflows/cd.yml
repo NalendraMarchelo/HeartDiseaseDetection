@@ -3,7 +3,6 @@
 # 225150200111005_3 NARENDRA ATHA ABHINAYA_3
 # 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
 
-# melakukan deployment ke Hugging Face
 name: Continuous Deployment
 
 # Pemicu
@@ -18,13 +17,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Langkah 1: Checkout kode dari repositori
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # Langkah 2: Lakukan 'git push' ke Hugging Face Space
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
