@@ -1,3 +1,8 @@
+# 225150207111001_1 MUHAMMAD NADHIF_1
+# 225150201111002_2 NALENDRA MARCHELO_2
+# 225150200111005_3 NARENDRA ATHA ABHINAYA_3
+ # 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
+
 # Dockerfile
 
 FROM python:3.9-slim
@@ -14,8 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Salin semua file dari proyek lokal ke dalam direktori kerja di container
 COPY . .
 
-# [PENTING] Jalankan proses training model saat image Docker dibuat.
-# memastikan file model.joblib tersedia di dalam container.
 RUN python app.py --train
 
 # Ekspos port yang digunakan oleh Gradio

@@ -1,3 +1,8 @@
+# 225150207111001_1 MUHAMMAD NADHIF_1
+# 225150201111002_2 NALENDRA MARCHELO_2
+# 225150200111005_3 NARENDRA ATHA ABHINAYA_3
+ # 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
+
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
