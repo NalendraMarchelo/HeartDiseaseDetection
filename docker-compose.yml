@@ -1,9 +1,3 @@
-# 225150207111001_1 MUHAMMAD NADHIF_1
-# 225150201111002_2 NALENDRA MARCHELO_2
-# 225150200111005_3 NARENDRA ATHA ABHINAYA_3
-# 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
-
-# Layanan pertama: MLflow Tracking Server
 services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.11.1
@@ -18,7 +12,6 @@ services:
       --backend-store-uri ./mlruns
       --default-artifact-root ./mlruns
 
-  # Layanan kedua: Prometheus
   prometheus:
     image: prom/prometheus:latest
     ports:
@@ -26,7 +19,6 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
 
-  # Layanan ketiga: Grafana
   grafana:
     image: grafana/grafana-oss:latest
     ports:
@@ -35,3 +27,20 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
+
+  # Layanan keempat: MLflow Model Serving
+  mlflow-serving:
+    image: ghcr.io/mlflow/mlflow:v2.11.1
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+    command: >
+      mlflow models serve
+      --tracking-uri http://mlflow:5000
+      --model-uri "models:/prediksi-penyakit-jantung/2"
+      --host 0.0.0.0
+      --port 8001
+      --enable-mlserver
+    depends_on:
+      - mlflow
