@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s # Seberapa sering Prometheus mengambil data (setiap 15 detik)
+
+scrape_configs:
+  - job_name: "mlflow-model-serving"
+    static_configs:
+      - targets: ["mlflow-serving:8001"]
