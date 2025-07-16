@@ -4,6 +4,7 @@
 # 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
 
 model/
+mlruns/
 
 venv/
 .venv/
