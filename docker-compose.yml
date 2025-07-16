@@ -1,5 +1,5 @@
+# Layanan pertama: MLflow Tracking Server
 services:
-  # Layanan pertama: MLflow Tracking Server
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.11.1
     ports:
@@ -20,3 +20,13 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  # Layanan ketiga: Grafana
+  grafana:
+    image: grafana/grafana-oss:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
