@@ -5,3 +5,9 @@ scrape_configs:
   - job_name: "mlflow-model-serving"
     static_configs:
       - targets: ["mlflow-serving:8001"]
+
+remote_write:
+- url: https://prometheus-prod-52-prod-ap-southeast-2.grafana.net/api/prom/push
+  basic_auth:
+    username: 2564023
+    password: glc_eyJvIjoiMTQ4NTM0NCIsIm4iOiJzdGFjay0xMzE5ODk0LWhtLXdyaXRlLW1sb3BzdGVzdDEiLCJrIjoiM0x5Qzl0MmY0NWZrcjBmdzZYSG85MFY3IiwibSI6eyJyIjoicHJvZC1hcC1zb3V0aGVhc3QtMiJ9fQ==
