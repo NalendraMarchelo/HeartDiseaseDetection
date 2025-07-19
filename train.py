@@ -55,7 +55,7 @@ def preprocess_data(df):
 def train_and_log_model(X_train, y_train, X_test, y_test, scaler, imputer, experiment_name, run_name):
     """Melatih model dan mencatat semuanya dengan MLflow."""
     # URI ini penting agar skrip di dalam Docker bisa menemukan server MLflow
-    mlflow.set_tracking_uri("http://mlflow-server:5000")
+    mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment(experiment_name)
     
     with mlflow.start_run(run_name=run_name) as run:
