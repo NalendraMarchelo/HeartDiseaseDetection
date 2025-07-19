@@ -54,7 +54,8 @@ def preprocess_data(df):
 # --- 3. FUNGSI UNTUK TRAINING DAN LOGGING ---
 def train_and_log_model(X_train, y_train, X_test, y_test, scaler, imputer, experiment_name, run_name):
     """Melatih model dan mencatat semuanya dengan MLflow."""
-    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    # URI ini penting agar skrip di dalam Docker bisa menemukan server MLflow
+    mlflow.set_tracking_uri("http://mlflow-server:5000")
     mlflow.set_experiment(experiment_name)
     
     with mlflow.start_run(run_name=run_name) as run:
@@ -79,12 +80,18 @@ def train_and_log_model(X_train, y_train, X_test, y_test, scaler, imputer, exper
         mlflow.log_metrics(metrics)
         print(f"Metrik dievaluasi: {metrics}")
         
+        # Log model sebagai artefak
         mlflow.sklearn.log_model(
             sk_model=model,
             artifact_path="model",
-            signature=signature,
-            registered_model_name="HeartDiseaseClassifier"
+            signature=signature
         )
+        
+        # Registrasi model secara manual
+        run_id = run.info.run_id
+        model_uri = f"runs:/{run_id}/model"
+        mlflow.register_model(model_uri=model_uri, name="HeartDiseaseClassifier")
+        print("Model berhasil diregistrasi dengan nama 'HeartDiseaseClassifier'")
         
         # Simpan dan log preprocessor sebagai artefak
         joblib.dump(scaler, "scaler.joblib")

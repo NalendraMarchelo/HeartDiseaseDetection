@@ -9,13 +9,9 @@ services:
       mlflow server
       --host 0.0.0.0
       --port 5000
-      --backend-store-uri sqlite:////mlruns/mlflow.db 
-      --default-artifact-root file:///mlruns
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      --backend-store-uri sqlite:////mlruns/mlflow.db
+      --default-artifact-root /mlruns
+      --serve-artifacts
 
   mlflow-serving:
     image: ghcr.io/mlflow/mlflow:v2.13.2
@@ -34,8 +30,7 @@ services:
       --port 8001
       --enable-mlserver
     depends_on:
-      mlflow-server:
-        condition: service_healthy
+      - mlflow-server
 
   gradio-app:
     build:
@@ -45,6 +40,8 @@ services:
       - "7860:7860"
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow-server:5000
+    volumes:
+      - ./data:/app/data
     depends_on:
       - mlflow-server
       - mlflow-serving

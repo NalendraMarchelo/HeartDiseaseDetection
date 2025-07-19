@@ -7,7 +7,7 @@ numpy
 joblib
 
 # MLOps Tools
-mlflow
+mlflow==2.13.2
 
 # Web App
 gradio
