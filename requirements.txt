@@ -1,15 +1,13 @@
-﻿# Core Data Science & ML
+﻿# requirements.txt
+
+# Core Data Science & ML
 pandas
-numpy
 scikit-learn
-xgboost
-imbalanced-learn
+numpy
+joblib
 
 # MLOps Tools
-dvc[ssh]
 mlflow
 
-# Web App & Visualization
+# Web App
 gradio
-matplotlib
-seaborn
