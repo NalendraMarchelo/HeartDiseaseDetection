@@ -6,7 +6,7 @@ import mlflow.sklearn
 import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from mlflow.models import infer_signature
@@ -34,14 +34,13 @@ def preprocess_data(df):
         X_preprocessed, y, test_size=0.2, random_state=42, stratify=y)
     return X_train, X_test, y_train, y_test, scaler, imputer
 
-
 # --- 2. KONFIGURASI DAN FUNGSI TRAINING ---
 def setup_mlflow_tracking():
     """Mengatur koneksi ke MLflow Tracking Server (DagsHub atau lokal)."""
     
     # --- GANTI DENGAN INFORMASI ANDA ---
-    DAGSHUB_USER = "NalendraMarchelo"  # Ganti dengan username DagsHub Anda
-    DAGSHUB_REPO = "HeartDiseaseDetection" # Ganti dengan nama repository DagsHub Anda
+    DAGSHUB_USER = "NalendraMarchelo"
+    DAGSHUB_REPO = "HeartDiseaseDetection"
     
     # Prioritaskan koneksi ke DagsHub jika kredensial ada
     if os.getenv("DAGSHUB_TOKEN"):
@@ -59,7 +58,7 @@ def setup_mlflow_tracking():
         mlflow.set_tracking_uri("http://localhost:5000")
 
 def train_and_log_model(X_train, y_train, X_test, y_test, scaler, imputer, experiment_name, run_name):
-    """Melatih model dan mencatat semuanya ke MLflow."""
+    """Melatih model dan mencatat semuanya dengan MLflow."""
     setup_mlflow_tracking()
     mlflow.set_experiment(experiment_name)
     
@@ -69,9 +68,17 @@ def train_and_log_model(X_train, y_train, X_test, y_test, scaler, imputer, exper
         model.fit(X_train, y_train)
         
         y_pred = model.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
-        mlflow.log_metric("accuracy", accuracy)
-        print(f"Akurasi: {accuracy}")
+        
+        # Hitung semua metrik yang diperlukan
+        metrics = {
+            "accuracy": accuracy_score(y_test, y_pred),
+            "recall": recall_score(y_test, y_pred),
+            "precision": precision_score(y_test, y_pred),
+            "f1_score": f1_score(y_test, y_pred)
+        }
+        # Log semua metrik sekaligus
+        mlflow.log_metrics(metrics)
+        print(f"Metrik dievaluasi: {metrics}")
 
         signature = infer_signature(X_train, model.predict(X_train))
         mlflow.sklearn.log_model(sk_model=model, artifact_path="model", signature=signature)
