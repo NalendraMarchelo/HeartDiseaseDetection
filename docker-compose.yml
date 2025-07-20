@@ -28,10 +28,10 @@ services:
     depends_on:
       - mlflow-server
 
-  app: # Mengganti nama menjadi 'app' agar lebih singkat
+  app:
     build:
       context: .
-      dockerfile: Dockerfile.app
+      dockerfile: Dockerfile
     ports:
       - "7860:7860"
     environment:
