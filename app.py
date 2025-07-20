@@ -73,10 +73,12 @@ def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_1
 
 # --- 3. ANTARMUKA GRADIo (Sesuai Kode Lama Anda) ---
 def create_gradio_interface():
-    # Contoh input dari kode lama Anda
+    # DIUBAH: examples_list sekarang menggunakan nilai numerik yang benar
     examples_list = [
-        [52, 1, "Typical Angina", 125, 212, 0, "Normal", 168, 0, 1.0, "Upsloping", 2, "Reversible Defect"],
-        [65, 1, "Asymptomatic", 155, 280, 1, "Hipertrofi Ventrikel Kiri", 120, 1, 2.5, "Flat", 2, "Reversible Defect"],
+        # Age, Sex, Chest pain, BP, Chol, FBS, EKG, Max HR, Ex Ang, ST Dep, Slope, Vessels, Thallium
+        [52, 1, 1, 125, 212, 0, 0, 168, 0, 1.0, 1, 2, 7], # Contoh 1
+        [65, 1, 4, 155, 280, 1, 2, 120, 1, 2.5, 2, 2, 7], # Contoh 2
+        [58, 0, 2, 160, 320, 0, 1, 115, 1, 3.0, 3, 3, 6]  # Contoh 3
     ]
 
     with gr.Blocks(theme=gr.themes.Default(), title="Prediksi Penyakit Jantung") as demo:
@@ -110,6 +112,7 @@ def create_gradio_interface():
             ekg_input, max_hr_input, exang_input, st_depression_input, slope_input, 
             vessels_input, thallium_input]
         
+        # Fungsi predict_heart_disease sudah menerima angka, jadi tidak perlu wrapped_predict
         predict_btn.click(fn=predict_heart_disease, inputs=inputs_list, outputs=output_label)
 
         gr.Examples(
