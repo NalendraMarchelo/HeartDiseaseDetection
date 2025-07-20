@@ -1,4 +1,4 @@
-# app.py
+# app.py (Final)
 import pandas as pd
 import gradio as gr
 import mlflow.pyfunc
@@ -34,7 +34,6 @@ try:
     print(f"Memuat model dari: {model_uri}")
     model = mlflow.pyfunc.load_model(model_uri)
     
-    # Download artefak preprocessor dari run yang terkait dengan versi model
     client = mlflow.tracking.MlflowClient()
     latest_version = client.get_latest_versions(name=MODEL_NAME, stages=[MODEL_STAGE])[0]
     run_id = latest_version.run_id
@@ -73,12 +72,12 @@ def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_1
 
 # --- 3. ANTARMUKA GRADIo (Sesuai Kode Lama Anda) ---
 def create_gradio_interface():
-    # DIUBAH: examples_list sekarang menggunakan nilai numerik yang benar
+    # Contoh input dari kode lama Anda (dalam format teks)
     examples_list = [
-        # Age, Sex, Chest pain, BP, Chol, FBS, EKG, Max HR, Ex Ang, ST Dep, Slope, Vessels, Thallium
-        [52, 1, 1, 125, 212, 0, 0, 168, 0, 1.0, 1, 2, 7], # Contoh 1
-        [65, 1, 4, 155, 280, 1, 2, 120, 1, 2.5, 2, 2, 7], # Contoh 2
-        [58, 0, 2, 160, 320, 0, 1, 115, 1, 3.0, 3, 3, 6]  # Contoh 3
+        [35, "Wanita", "Typical Angina", 120, 190, "Tidak", "Normal", 170, "Tidak", 0.5, "Upsloping", 0, "Normal"],
+        [42, "Pria", "Non-anginal Pain", 130, 210, "Tidak", "Normal", 165, "Tidak", 0.0, "Upsloping", 0, "Normal"],
+        [65, "Pria", "Asymptomatic", 155, 280, "Ya", "Hipertrofi Ventrikel Kiri", 120, "Ya", 2.5, "Flat", 2, "Reversible Defect"],
+        [58, "Wanita", "Atypical Angina", 160, 320, "Tidak", "Abnormalitas ST-T", 115, "Ya", 3.0, "Downsloping", 3, "Fixed Defect"]
     ]
 
     with gr.Blocks(theme=gr.themes.Default(), title="Prediksi Penyakit Jantung") as demo:
@@ -88,44 +87,59 @@ def create_gradio_interface():
         with gr.Row():
             with gr.Column():
                 age_input = gr.Slider(label="Usia", minimum=29, maximum=77, step=1, value=54)
-                sex_input = gr.Radio(label="Jenis Kelamin", choices=[("Wanita", 0), ("Pria", 1)], value=1)
-                cp_input = gr.Dropdown(label="Jenis Nyeri Dada", choices=[("Typical Angina", 1), ("Atypical Angina", 2), ("Non-anginal Pain", 3), ("Asymptomatic", 4)], value=3)
+                sex_input = gr.Radio(label="Jenis Kelamin", choices=["Wanita", "Pria"], value="Pria", type="index")
+                cp_input = gr.Dropdown(label="Jenis Nyeri Dada", choices=["Typical Angina", "Atypical Angina", "Non-anginal Pain", "Asymptomatic"], value="Non-anginal Pain")
             with gr.Column():
                 bp_input = gr.Slider(label="Tekanan Darah", minimum=94, maximum=200, step=1, value=131)
                 chol_input = gr.Slider(label="Kolesterol", minimum=126, maximum=564, step=1, value=249)
                 max_hr_input = gr.Slider(label="Detak Jantung Maks", minimum=71, maximum=202, step=1, value=149)
         with gr.Row():
-            with gr.Column(scale=2):
-                fbs_input = gr.Radio(label="Gula Darah > 120", choices=[("Tidak", 0), ("Ya", 1)], value=0)
-                ekg_input = gr.Dropdown(label="Hasil EKG", choices=[("Normal", 0), ("Abnormalitas ST-T", 1), ("Hipertrofi Ventrikel Kiri", 2)], value=1)
-                exang_input = gr.Radio(label="Angina Saat Olahraga", choices=[("Tidak", 0), ("Ya", 1)], value=0)
+            with gr.Column():
+                fbs_input = gr.Radio(label="Gula Darah > 120", choices=["Tidak", "Ya"], value="Tidak", type="index")
+                ekg_input = gr.Dropdown(label="Hasil EKG", choices=["Normal", "Abnormalitas ST-T", "Hipertrofi Ventrikel Kiri"], value="Abnormalitas ST-T")
+                exang_input = gr.Radio(label="Angina Saat Olahraga", choices=["Tidak", "Ya"], value="Tidak", type="index")
                 st_depression_input = gr.Slider(label="ST Depression", minimum=0.0, maximum=6.2, step=0.1, value=1.0)
-                slope_input = gr.Dropdown(label="Slope ST", choices=[("Upsloping", 1), ("Flat", 2), ("Downsloping", 3)], value=2)
-                vessels_input = gr.Dropdown(label="Jumlah Pembuluh Terlihat", choices=[0, 1, 2, 3], value=0)
-                thallium_input = gr.Dropdown(label="Thallium", choices=[("Normal", 3), ("Fixed Defect", 6), ("Reversible Defect", 7)], value=7)
-            with gr.Column(scale=1):
+                slope_input = gr.Dropdown(label="Slope ST", choices=["Upsloping", "Flat", "Downsloping"], value="Flat")
+                vessels_input = gr.Dropdown(label="Jumlah Pembuluh Terlihat", choices=[0,1,2,3], value=0)
+                thallium_input = gr.Dropdown(label="Thallium", choices=["Normal", "Fixed Defect", "Reversible Defect"], value="Normal")
+            with gr.Column():
                 predict_btn = gr.Button("🔮 Lakukan Prediksi", variant="primary")
                 output_label = gr.Label(label="Status Risiko")
+
+        # Fungsi wrapper untuk mapping string ke angka
+        def wrapped_predict(Age, Sex_str, cp_str, BP, Chol, FBS_str, ekg_str, Max_HR, exang_str, ST_dep, slope_str, vessel, thallium_str):
+            mapping_cp = {"Typical Angina": 1, "Atypical Angina": 2, "Non-anginal Pain": 3, "Asymptomatic": 4}
+            mapping_ekg = {"Normal": 0, "Abnormalitas ST-T": 1, "Hipertrofi Ventrikel Kiri": 2}
+            mapping_slope = {"Upsloping": 1, "Flat": 2, "Downsloping": 3}
+            mapping_thallium = {"Normal": 3, "Fixed Defect": 6, "Reversible Defect": 7}
+            
+            # Konversi string dari UI ke angka yang dibutuhkan model
+            Sex = 0 if Sex_str == "Wanita" else 1
+            FBS = 0 if FBS_str == "Tidak" else 1
+            exang = 0 if exang_str == "Tidak" else 1
+
+            return predict_heart_disease(
+                Age, Sex, mapping_cp[cp_str], BP, Chol, FBS, mapping_ekg[ekg_str], Max_HR, 
+                exang, ST_dep, mapping_slope[slope_str], vessel, mapping_thallium[thallium_str])
         
         inputs_list = [
             age_input, sex_input, cp_input, bp_input, chol_input, fbs_input, 
             ekg_input, max_hr_input, exang_input, st_depression_input, slope_input, 
             vessels_input, thallium_input]
         
-        # Fungsi predict_heart_disease sudah menerima angka, jadi tidak perlu wrapped_predict
-        predict_btn.click(fn=predict_heart_disease, inputs=inputs_list, outputs=output_label)
+        predict_btn.click(fn=wrapped_predict, inputs=inputs_list, outputs=output_label)
 
         gr.Examples(
             examples=examples_list,
             inputs=inputs_list,
             outputs=output_label,
-            fn=predict_heart_disease,
-            cache_examples=False
+            fn=wrapped_predict,
+            cache_examples=True
         )
     return demo
 
 # --- 4. BLOK EKSEKUSI UTAMA ---
 if __name__ == "__main__":
     print("Menjalankan aplikasi Gradio...")
-    app_interface = create_gradio_interface()
-    app_interface.launch(server_name="0.0.0.0", server_port=7860)
+    demo = create_gradio_interface()
+    demo.launch(server_name="0.0.0.0", server_port=7860)
