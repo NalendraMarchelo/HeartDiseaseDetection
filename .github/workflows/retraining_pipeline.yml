@@ -1,13 +1,12 @@
 # .github/workflows/retraining_pipeline.yml
-
-name: Automated Model Retraining
+name: Automated Retraining with Dynamic Data
 
 on:
   repository_dispatch:
     types: [trigger-retraining]
 
 jobs:
-  retrain:
+  retrain-and-version:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -21,11 +20,21 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      #  - name: Download Training Data
-      #    run: python download_data.py
+      - name: Update Training Dataset
+        run: python update_dataset.py
 
-      #  - name: Combine Datasets for Retraining
-      #    run: python combine_data.py
+      - name: Commit and Push Updated Data
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add data/combined_data.csv data/new_logs.csv
+          # Commit hanya jika ada perubahan
+          if git diff-index --quiet HEAD --; then
+            echo "No changes to commit."
+          else
+            git commit -m "feat: Append new prediction logs to training data"
+            git push
+          fi
 
       - name: Run Training Script
         env:

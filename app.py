@@ -67,6 +67,16 @@ except Exception as e:
     print(f"Error saat memuat model atau preprocessor: {e}")
     sys.exit(1)
 
+def log_prediction_data(feature_dict):
+         """Mencatat data prediksi baru ke file log."""
+log_file = 'data/new_logs.csv'
+df_new = pd.DataFrame([feature_dict])
+    
+    # Jika file sudah ada, tambahkan tanpa header. Jika tidak, buat baru dengan header.
+if os.path.exists(log_file):
+        df_new.to_csv(log_file, mode='a', header=False, index=False)
+else:
+        df_new.to_csv(log_file, index=False)
 
 # --- 3. FUNGSI PREDIKSI (DENGAN LOGGING METRIK) ---
 def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_120, EKG_results, Max_HR, Exercise_angina, ST_depression, Slope_of_ST, Number_of_vessels_fluro, Thallium):
