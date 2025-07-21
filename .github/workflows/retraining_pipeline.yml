@@ -1,4 +1,5 @@
 # .github/workflows/retraining_pipeline.yml
+
 name: Automated Model Retraining
 
 on:
@@ -11,8 +12,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up DVC
         uses: iterative/setup-dvc@v1
@@ -25,19 +24,21 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
+      - name: Remove local data before DVC pull
+        run: rm -rf ./data
+
       - name: Pull Latest Data with DVC
         run: dvc pull
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
 
-      - name: Create New Training Dataset
-        # Menjalankan skrip untuk menggabungkan data lama dengan log prediksi baru
-        run: python combine_data.py # Modifikasi combine_data.py untuk membaca new_prediction_logs.csv
+      - name: Combine Datasets for Retraining
+        run: python combine_data.py
 
       - name: Run Training Script
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: python train.py --dataset data/combined_data.csv --run_name "Automated Retraining"
+        run: python train.py --dataset data/combined_data.csv --run_name "Automated Retraining via GitHub Actions"
 
       - name: Promote New Model to Production
         env:
