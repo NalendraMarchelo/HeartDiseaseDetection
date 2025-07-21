@@ -21,8 +21,8 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Combine Datasets for Retraining
-        run: python combine_data.py
+      #  - name: Combine Datasets for Retraining
+      #    run: python combine_data.py
 
       - name: Run Training Script
         env:
