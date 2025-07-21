@@ -73,8 +73,8 @@ def reload_model_endpoint():
 
 # --- 2. KONFIGURASI DAN PEMUATAN MODEL ---
 def setup_mlflow_tracking():
-    # MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
-    # print(f"Menggunakan MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
+    MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    print(f"Menggunakan MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
     
     """Mengatur koneksi ke MLflow Tracking Server (DagsHub atau lokal)."""
     if os.getenv("DAGSHUB_TOKEN"):
