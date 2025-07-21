@@ -3,7 +3,8 @@
 name: Automated Model Retraining
 
 on:
-  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-retraining]
 
 jobs:
   retrain:
