@@ -1,4 +1,8 @@
-# train.py (Versi DagsHub)
+# 225150207111001_1 MUHAMMAD NADHIF_1
+# 225150201111002_2 NALENDRA MARCHELO_2
+# 225150200111005_3 NARENDRA ATHA ABHINAYA_3
+# 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
+
 import pandas as pd
 import argparse
 import mlflow
@@ -38,7 +42,6 @@ def preprocess_data(df):
 def setup_mlflow_tracking():
     """Mengatur koneksi ke MLflow Tracking Server (DagsHub atau lokal)."""
     
-    # --- GANTI DENGAN INFORMASI ANDA ---
     DAGSHUB_USER = "NalendraMarchelo"
     DAGSHUB_REPO = "HeartDiseaseDetection"
     
@@ -49,11 +52,9 @@ def setup_mlflow_tracking():
         os.environ['MLFLOW_TRACKING_PASSWORD'] = os.getenv("DAGSHUB_TOKEN")
         mlflow.set_tracking_uri(f"https://dagshub.com/{DAGSHUB_USER}/{DAGSHUB_REPO}.mlflow")
     elif os.getenv("MLFLOW_TRACKING_URI"):
-        # Digunakan saat berjalan di dalam Docker
         print(f"Menggunakan MLflow Tracking Server dari environment: {os.getenv('MLFLOW_TRACKING_URI')}")
         mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     else:
-        # Fallback ke server lokal jika tidak ada konfigurasi lain
         print("Menggunakan MLflow Tracking Server lokal...")
         mlflow.set_tracking_uri("http://localhost:5000")
 
@@ -69,14 +70,12 @@ def train_and_log_model(X_train, y_train, X_test, y_test, scaler, imputer, exper
         
         y_pred = model.predict(X_test)
         
-        # Hitung semua metrik yang diperlukan
         metrics = {
             "accuracy": accuracy_score(y_test, y_pred),
             "recall": recall_score(y_test, y_pred),
             "precision": precision_score(y_test, y_pred),
             "f1_score": f1_score(y_test, y_pred)
         }
-        # Log semua metrik sekaligus
         mlflow.log_metrics(metrics)
         print(f"Metrik dievaluasi: {metrics}")
 

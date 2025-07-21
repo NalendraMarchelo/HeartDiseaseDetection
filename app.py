@@ -1,4 +1,8 @@
-# app.py (Final)
+# 225150207111001_1 MUHAMMAD NADHIF_1
+# 225150201111002_2 NALENDRA MARCHELO_2
+# 225150200111005_3 NARENDRA ATHA ABHINAYA_3
+# 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
+
 import pandas as pd
 import gradio as gr
 import mlflow.pyfunc
@@ -90,7 +94,7 @@ def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_1
     return "Berisiko Tinggi (Presence)" if prediction == 1 else "Berisiko Rendah (Absence)"
 
 
-# --- 4. ANTARMUKA GRADIo (Sesuai Tata Letak Lama Anda) ---
+# --- 4. ANTARMUKA GRADIO ---
 def create_gradio_interface():
     examples_list = [
         [35, "Wanita", "Typical Angina", 120, 190, "Tidak", "Normal", 170, "Tidak", 0.5, "Upsloping", 0, "Normal"],
@@ -157,9 +161,7 @@ def create_gradio_interface():
 
 # --- 5. BLOK EKSEKUSI UTAMA ---
 if __name__ == "__main__":
-    # Jalankan Flask app di thread terpisah untuk endpoint /metrics
     def run_flask():
-        # Port 8000 adalah port default yang biasanya digunakan untuk metrics
         flask_app.run(host='0.0.0.0', port=8000)
 
     flask_thread = threading.Thread(target=run_flask)
@@ -167,7 +169,6 @@ if __name__ == "__main__":
     flask_thread.start()
     print("Flask server untuk Prometheus metrics berjalan di port 8000.")
 
-    # Jalankan aplikasi Gradio
     print("Menjalankan aplikasi Gradio...")
     demo = create_gradio_interface()
     demo.launch(server_name="0.0.0.0", server_port=7860)

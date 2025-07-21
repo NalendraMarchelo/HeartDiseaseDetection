@@ -1,4 +1,8 @@
-# check_drift.py (for evidently==0.4.0)
+# 225150207111001_1 MUHAMMAD NADHIF_1
+# 225150201111002_2 NALENDRA MARCHELO_2
+# 225150200111005_3 NARENDRA ATHA ABHINAYA_3
+# 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
+
 import pandas as pd
 from evidently.report import Report
 from evidently.metric_preset import DataDriftPreset
@@ -34,12 +38,12 @@ data_drift_report.run(reference_data=reference_data, current_data=current_data)
 
 # Simpan laporan sebagai file HTML
 report_path = 'data_drift_report.html'
-data_drift_report.save_html(report_path)  # Changed from save() to save_html()
+data_drift_report.save_html(report_path)
 
 print(f"\n✅ Laporan data drift berhasil dibuat!")
 print(f"Buka file '{report_path}' di browser Anda untuk melihat hasilnya.")
 
-# --- Integrasi dengan MLflow (Opsional) ---
+# --- Integrasi dengan MLflow ---
 try:
     if os.getenv("DAGSHUB_TOKEN"):
         DAGSHUB_USER = "NalendraMarchelo"

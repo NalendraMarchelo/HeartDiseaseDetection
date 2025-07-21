@@ -1,14 +1,17 @@
+# 225150207111001_1 MUHAMMAD NADHIF_1
+# 225150201111002_2 NALENDRA MARCHELO_2
+# 225150200111005_3 NARENDRA ATHA ABHINAYA_3
+# 225150200111003_4 YOSUA SAMUEL EDLYN SINAGA_4
+
 # prometheus.yml
 global:
   scrape_interval: 15s
 
 scrape_configs:
   - job_name: "heart_disease_app"
-    # DIUBAH: Target sekarang adalah layanan 'app' di port 8000, tempat Flask berjalan
     static_configs:
       - targets: ["app:8000"]
 
-# Bagian ini untuk koneksi ke Grafana Cloud, bisa dibiarkan jika Anda menggunakannya
 remote_write:
   - url: https://prometheus-prod-52-prod-ap-southeast-2.grafana.net/api/prom/push
     basic_auth:
