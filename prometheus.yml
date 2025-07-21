@@ -1,11 +1,14 @@
+# prometheus.yml
 global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: "mlflow-model-serving"
+  - job_name: "heart_disease_app"
+    # DIUBAH: Target sekarang adalah layanan 'app' di port 8000, tempat Flask berjalan
     static_configs:
-      - targets: ["mlflow-serving:8081"]
+      - targets: ["app:8000"]
 
+# Bagian ini untuk koneksi ke Grafana Cloud, bisa dibiarkan jika Anda menggunakannya
 remote_write:
   - url: https://prometheus-prod-52-prod-ap-southeast-2.grafana.net/api/prom/push
     basic_auth:

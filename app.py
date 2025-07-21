@@ -5,25 +5,36 @@ import mlflow.pyfunc
 import joblib
 import os
 import sys
+import threading
+from flask import Flask, Response
+from prometheus_client import Gauge, generate_latest, REGISTRY
 
-# --- 1. KONFIGURASI DAN PEMUATAN MODEL ---
+# --- 1. SETUP PROMETHEUS METRICS ---
+# Mendefinisikan metrik untuk memonitor nilai fitur yang masuk
+PREDICTION_GAUGE = Gauge('prediction_feature_value', 'Last value of a feature for prediction', ['feature_name'])
+print("Metrik Prometheus didefinisikan.")
+
+# Membuat aplikasi Flask terpisah untuk menyajikan endpoint /metrics
+flask_app = Flask(__name__)
+@flask_app.route("/metrics")
+def get_metrics():
+    return Response(generate_latest(REGISTRY), mimetype="text/plain")
+
+# --- 2. KONFIGURASI DAN PEMUATAN MODEL ---
 def setup_mlflow_tracking():
     """Mengatur koneksi ke MLflow Tracking Server (DagsHub atau lokal)."""
     DAGSHUB_USER = "NalendraMarchelo"
     DAGSHUB_REPO = "HeartDiseaseDetection"
     
-    # Prioritaskan koneksi ke DagsHub jika kredensial ada (untuk Hugging Face)
     if os.getenv("DAGSHUB_TOKEN"):
         print("Menggunakan DagsHub MLflow Tracking Server...")
         os.environ['MLFLOW_TRACKING_USERNAME'] = DAGSHUB_USER
         os.environ['MLFLOW_TRACKING_PASSWORD'] = os.getenv("DAGSHUB_TOKEN")
         mlflow.set_tracking_uri(f"https://dagshub.com/{DAGSHUB_USER}/{DAGSHUB_REPO}.mlflow")
     else:
-        # Fallback ke server lokal jika tidak ada konfigurasi lain (untuk development)
         print("Menggunakan MLflow Tracking Server lokal...")
         mlflow.set_tracking_uri("http://localhost:5000")
 
-# Panggil fungsi setup saat aplikasi dimulai
 setup_mlflow_tracking()
 
 try:
@@ -46,33 +57,39 @@ try:
     imputer = joblib.load("imputer.joblib")
     
     print("Model dan preprocessor berhasil dimuat.")
-
 except Exception as e:
     print(f"Error saat memuat model atau preprocessor: {e}")
     sys.exit(1)
 
 
-# --- 2. FUNGSI PREDIKSI ---
+# --- 3. FUNGSI PREDIKSI (DENGAN LOGGING METRIK) ---
 def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_120, EKG_results, Max_HR, Exercise_angina, ST_depression, Slope_of_ST, Number_of_vessels_fluro, Thallium):
     feature_names = ['Age', 'Sex', 'Chest pain type', 'BP', 'Cholesterol', 'FBS over 120', 
                      'EKG results', 'Max HR', 'Exercise angina', 'ST depression', 'Slope of ST', 
                      'Number of vessels fluro', 'Thallium']
     
-    input_data = pd.DataFrame([[Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_120, EKG_results, 
-                                Max_HR, Exercise_angina, ST_depression, Slope_of_ST, 
-                                Number_of_vessels_fluro, Thallium]], columns=feature_names)
+    input_values = [Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_120, EKG_results, 
+                    Max_HR, Exercise_angina, ST_depression, Slope_of_ST, 
+                    Number_of_vessels_fluro, Thallium]
     
+    # Kirim nilai fitur mentah ke Prometheus sebelum diproses
+    for feature, value in zip(feature_names, input_values):
+        PREDICTION_GAUGE.labels(feature_name=feature).set(value)
+    
+    input_data = pd.DataFrame([input_values], columns=feature_names)
+    
+    # Preprocessing
     input_imputed = imputer.transform(input_data)
     input_scaled = scaler.transform(input_imputed)
     input_processed = pd.DataFrame(input_scaled, columns=feature_names)
     
+    # Prediksi
     prediction = model.predict(input_processed)[0]
     return "Berisiko Tinggi (Presence)" if prediction == 1 else "Berisiko Rendah (Absence)"
 
 
-# --- 3. ANTARMUKA GRADIo (Sesuai Kode Lama Anda) ---
+# --- 4. ANTARMUKA GRADIo (Sesuai Tata Letak Lama Anda) ---
 def create_gradio_interface():
-    # Contoh input dari kode lama Anda (dalam format teks)
     examples_list = [
         [35, "Wanita", "Typical Angina", 120, 190, "Tidak", "Normal", 170, "Tidak", 0.5, "Upsloping", 0, "Normal"],
         [42, "Pria", "Non-anginal Pain", 130, 210, "Tidak", "Normal", 165, "Tidak", 0.0, "Upsloping", 0, "Normal"],
@@ -87,7 +104,7 @@ def create_gradio_interface():
         with gr.Row():
             with gr.Column():
                 age_input = gr.Slider(label="Usia", minimum=29, maximum=77, step=1, value=54)
-                sex_input = gr.Radio(label="Jenis Kelamin", choices=["Wanita", "Pria"], value="Pria", type="index")
+                sex_input = gr.Radio(label="Jenis Kelamin", choices=["Wanita", "Pria"], value="Pria")
                 cp_input = gr.Dropdown(label="Jenis Nyeri Dada", choices=["Typical Angina", "Atypical Angina", "Non-anginal Pain", "Asymptomatic"], value="Non-anginal Pain")
             with gr.Column():
                 bp_input = gr.Slider(label="Tekanan Darah", minimum=94, maximum=200, step=1, value=131)
@@ -95,9 +112,9 @@ def create_gradio_interface():
                 max_hr_input = gr.Slider(label="Detak Jantung Maks", minimum=71, maximum=202, step=1, value=149)
         with gr.Row():
             with gr.Column():
-                fbs_input = gr.Radio(label="Gula Darah > 120", choices=["Tidak", "Ya"], value="Tidak", type="index")
+                fbs_input = gr.Radio(label="Gula Darah > 120", choices=["Tidak", "Ya"], value="Tidak")
                 ekg_input = gr.Dropdown(label="Hasil EKG", choices=["Normal", "Abnormalitas ST-T", "Hipertrofi Ventrikel Kiri"], value="Abnormalitas ST-T")
-                exang_input = gr.Radio(label="Angina Saat Olahraga", choices=["Tidak", "Ya"], value="Tidak", type="index")
+                exang_input = gr.Radio(label="Angina Saat Olahraga", choices=["Tidak", "Ya"], value="Tidak")
                 st_depression_input = gr.Slider(label="ST Depression", minimum=0.0, maximum=6.2, step=0.1, value=1.0)
                 slope_input = gr.Dropdown(label="Slope ST", choices=["Upsloping", "Flat", "Downsloping"], value="Flat")
                 vessels_input = gr.Dropdown(label="Jumlah Pembuluh Terlihat", choices=[0,1,2,3], value=0)
@@ -106,21 +123,20 @@ def create_gradio_interface():
                 predict_btn = gr.Button("🔮 Lakukan Prediksi", variant="primary")
                 output_label = gr.Label(label="Status Risiko")
 
-        # Fungsi wrapper untuk mapping string ke angka
+        # Fungsi wrapper untuk mapping input teks dari UI/Examples ke angka
         def wrapped_predict(Age, Sex_str, cp_str, BP, Chol, FBS_str, ekg_str, Max_HR, exang_str, ST_dep, slope_str, vessel, thallium_str):
-            mapping_cp = {"Typical Angina": 1, "Atypical Angina": 2, "Non-anginal Pain": 3, "Asymptomatic": 4}
-            mapping_ekg = {"Normal": 0, "Abnormalitas ST-T": 1, "Hipertrofi Ventrikel Kiri": 2}
-            mapping_slope = {"Upsloping": 1, "Flat": 2, "Downsloping": 3}
-            mapping_thallium = {"Normal": 3, "Fixed Defect": 6, "Reversible Defect": 7}
-            
-            # Konversi string dari UI ke angka yang dibutuhkan model
+            mapping = {
+                "cp": {"Typical Angina": 1, "Atypical Angina": 2, "Non-anginal Pain": 3, "Asymptomatic": 4},
+                "ekg": {"Normal": 0, "Abnormalitas ST-T": 1, "Hipertrofi Ventrikel Kiri": 2},
+                "slope": {"Upsloping": 1, "Flat": 2, "Downsloping": 3},
+                "thallium": {"Normal": 3, "Fixed Defect": 6, "Reversible Defect": 7}
+            }
             Sex = 0 if Sex_str == "Wanita" else 1
             FBS = 0 if FBS_str == "Tidak" else 1
             exang = 0 if exang_str == "Tidak" else 1
-
             return predict_heart_disease(
-                Age, Sex, mapping_cp[cp_str], BP, Chol, FBS, mapping_ekg[ekg_str], Max_HR, 
-                exang, ST_dep, mapping_slope[slope_str], vessel, mapping_thallium[thallium_str])
+                Age, Sex, mapping["cp"][cp_str], BP, Chol, FBS, mapping["ekg"][ekg_str], Max_HR, 
+                exang, ST_dep, mapping["slope"][slope_str], vessel, mapping["thallium"][thallium_str])
         
         inputs_list = [
             age_input, sex_input, cp_input, bp_input, chol_input, fbs_input, 
@@ -134,12 +150,22 @@ def create_gradio_interface():
             inputs=inputs_list,
             outputs=output_label,
             fn=wrapped_predict,
-            cache_examples=True
-        )
+            cache_examples=True)
     return demo
 
-# --- 4. BLOK EKSEKUSI UTAMA ---
+# --- 5. BLOK EKSEKUSI UTAMA ---
 if __name__ == "__main__":
+    # Jalankan Flask app di thread terpisah untuk endpoint /metrics
+    def run_flask():
+        # Port 8000 adalah port default yang biasanya digunakan untuk metrics
+        flask_app.run(host='0.0.0.0', port=8000)
+
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+    print("Flask server untuk Prometheus metrics berjalan di port 8000.")
+
+    # Jalankan aplikasi Gradio
     print("Menjalankan aplikasi Gradio...")
     demo = create_gradio_interface()
     demo.launch(server_name="0.0.0.0", server_port=7860)

@@ -12,41 +12,44 @@ services:
       --backend-store-uri sqlite:////mlruns/mlflow.db
       --default-artifact-root /mlruns
       --serve-artifacts
-    networks: # <-- Add this
-      - mlops-net
-
-  mlflow-serving:
-    image: ghcr.io/mlflow/mlflow:v2.13.2
-    ports:
-      - "8001:8001"
-      - "8081:8081"
-    volumes:
-      - ./mlruns:/mlruns
-    environment:
-      - MLFLOW_TRACKING_URI=http://mlflow-server:5000
-      - MODEL_URI=models:/HeartDiseaseClassifier/Production
-    command: mlflow models serve --model-uri ${MODEL_URI} --host 0.0.0.0 --port 8001 --enable-mlserver
-    depends_on:
-      - mlflow-server
     networks:
       - mlops-net
+
+  # Layanan mlflow-serving tidak lagi diperlukan karena app.py akan mengekspos metrik
+  # mlflow-serving:
+  #   image: ghcr.io/mlflow/mlflow:v2.13.2
+  #   ports:
+  #     - "8001:8001"
+  #     - "8081:8081"
+  #   volumes:
+  #     - ./mlruns:/mlruns
+  #   environment:
+  #     - MLFLOW_TRACKING_URI=http://mlflow-server:5000
+  #     - MODEL_URI=models:/HeartDiseaseClassifier/Production
+  #   command: mlflow models serve --model-uri ${MODEL_URI} --host 0.0.0.0 --port 8001 --enable-mlserver
+  #   depends_on:
+  #     - mlflow-server
+  #   networks:
+  #     - mlops-net
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "7860:7860"
+      - "7860:7860" # Port untuk Gradio UI
+      - "8000:8000" # Port untuk metrik Prometheus
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow-server:5000
+      # meneruskan token DagsHub di sini jika diperlukan untuk deployment
+      - DAGSHUB_TOKEN=${DAGSHUB_TOKEN}
     volumes:
       - ./data:/app/data
       - ./scaler.joblib:/app/scaler.joblib
       - ./imputer.joblib:/app/imputer.joblib
     depends_on:
       - mlflow-server
-      - mlflow-serving
-    networks: # <-- Add this
+    networks:
       - mlops-net
 
   prometheus:
@@ -56,8 +59,8 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     depends_on:
-      - mlflow-serving
-    networks: # <-- Add this
+      - app # DIUBAH: Sekarang bergantung pada 'app'
+    networks:
       - mlops-net
 
   grafana:
@@ -68,10 +71,9 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
-    networks: # <-- Add this
+    networks:
       - mlops-net
 
-# Add this entire block to the end of the file
 networks:
   mlops-net:
     driver: bridge
