@@ -29,4 +29,5 @@ Thumbs.db
 # ...but DO NOT ignore .dvc files and the .gitignore within it.
 !/data/*.dvc
 !/data/.gitignore
-/data
+
+data/combined_data.csv
