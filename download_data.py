@@ -6,7 +6,7 @@ os.makedirs('data', exist_ok=True)
 
 # Ganti URL di bawah ini dengan URL raw dari DagsHub Anda
 urls = {
-    "old_data.csv": "https://dagshub.com/NalendraMarchelo/HeartDiseaseDetection/raw/main/data/old_data.csv",
+    "old_data.csv": "https://dagshub.com/NalendraMarchelo/HeartDiseaseDetection/src/main/data/old_data.csv",
     "synthetic_data.csv": "https://dagshub.com/NalendraMarchelo/HeartDiseaseDetection/raw/main/data/synthetic_data.csv"
 }
 
