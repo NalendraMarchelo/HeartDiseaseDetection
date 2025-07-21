@@ -1,6 +1,6 @@
-# .github/workflows/retraining_pipeline.yml
+# .github/workflows/retraining_pipeline.yml (Versi Final Sederhana - Tanpa DVC)
 
-name: Automated Model Retraining and Data Versioning
+name: Automated Model Retraining
 
 on:
   repository_dispatch:
@@ -9,18 +9,9 @@ on:
 jobs:
   retrain:
     runs-on: ubuntu-latest
-
-    # Menetapkan direktori kerja default untuk semua langkah
-    defaults:
-      run:
-        working-directory: ./
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-
-      - name: Set up DVC
-        uses: iterative/setup-dvc@v1
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -30,16 +21,12 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Pull Latest Data with DVC
-        run: dvc pull
-        env:
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-
       - name: Combine Datasets for Retraining
         run: python combine_data.py
 
       - name: Run Training Script
         env:
+          # Menggunakan secret yang sudah Anda simpan di GitHub
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: python train.py --dataset data/combined_data.csv --run_name "Automated Retraining via GitHub Actions"
 
@@ -47,15 +34,3 @@ jobs:
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: python promote_model.py
-
-      - name: Version and Push New Data to DagsHub
-        env:
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          dvc add data/combined_data.csv
-          git add data/combined_data.csv.dvc
-          git commit -m "feat: Update combined training data after automated retraining"
-          dvc push
-          git push
