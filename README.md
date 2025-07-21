@@ -8,110 +8,160 @@ app_file: app.py
 pinned: false
 ---
 
-# 🩺 Prediksi Penyakit Jantung - Proyek MLOps
+# 🩺 Prediksi Penyakit Jantung MLOps
 
-Proyek ini bertujuan untuk membangun sistem prediksi penyakit jantung menggunakan model machine learning dan menerapkan praktik MLOps untuk otomatisasi, mulai dari pelatihan model hingga deployment aplikasi web interaktif.
+Repositori ini adalah implementasi end-to-end dari siklus hidup Machine Learning (MLOps) untuk kasus prediksi penyakit jantung. Proyek ini mencakup semua tahapan, mulai dari pembuatan data sintetis, versioning, pelatihan model, monitoring, hingga retraining otomatis saat terdeteksi adanya data drift.
 
-#### Teknologi Utama:
+![Made with Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Made with Scikit-learn](https://img.shields.io/badge/scikit--learn-%23F7931E.svg?style=for-the-badge&logo=scikit-learn&logoColor=white)
+![Gradio](https://img.shields.io/badge/Gradio-FF7C00.svg?style=for-the-badge&logo=Gradio&logoColor=white)
+![Made with Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Made with Github Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
 
-- Model: Scikit-learn (RandomForestClassifier)
-- Aplikasi Web: Gradio
-- Kontainerisasi: Docker
-- CI/CD: GitHub Actions
-- Deployment: Hugging Face Space
+---
 
-#### 📁 Struktur Folder
+#### 📖 Ringkasan Proyek
 
-Berikut adalah struktur folder utama dari proyek ini dan penjelasan singkatnya:
-├── .github/workflows/
-│ └── main.yml # Konfigurasi GitHub Actions untuk CI/CD ke Hugging Face
-├── data/
-│ └── Heart_Disease_Prediction.csv # Dataset yang digunakan
-├── model/
-│ └── # Folder ini akan berisi model.joblib setelah dilatih
-├── app.py # Kode utama aplikasi (fungsi training & antarmuka Gradio)
-├── Dockerfile # Resep untuk membangun container Docker
-├── notebook.ipynb # Notebook untuk eksplorasi data (EDA) dan pengujian awal
-└── requirements.txt # Daftar library Python yang dibutuhkan
+Proyek ini bertujuan untuk membangun sebuah sistem yang tidak hanya dapat melatih model untuk mendeteksi penyakit jantung, tetapi juga mampu memantau performa model di lingkungan produksi. Jika terjadi pergeseran distribusi data (data drift), sistem dapat memberikan notifikasi dan memicu proses pelatihan ulang (retraining) untuk memastikan model tetap relevan dan akurat.
 
-- app.py adalah file final yang akan dijalankan di produksi (di Docker dan Hugging Face).
-- notebook.ipynb digunakan sebagai tempat eksplorasi, analisis, dan pengujian logika model. Alur di notebook ini telah disesuaikan agar cocok dengan logika final di app.py.
+---
 
-#### 🚀 Memulai (Panduan)
+#### ⚙️ Alur Kerja MLOps
 
-Ikuti langkah-langkah ini untuk menjalankan proyek di komputer lokal.
+Berikut adalah tahapan alur kerja MLOps yang diimplementasikan dalam proyek ini:
 
-1. Requirements
+1. Simulasi Data Baru: Data sintetis dibuat menggunakan CTGAN untuk mensimulasikan data baru yang akan masuk di lingkungan produksi. Data ini digunakan untuk menguji ketahanan model terhadap data drift.
+2. Data Versioning: DVC (Data Version Control) digunakan untuk melacak versi dataset (data asli, sintetis, dan gabungan). Hal ini memastikan setiap eksperimen menggunakan data yang tepat dan dapat direproduksi.
+3. Experiment Logging & Model Versioning: MLflow digunakan untuk mencatat semua eksperimen, termasuk parameter, metrik, dan artefak model. Model yang telah dilatih kemudian di-versi-kan dan didaftarkan di MLflow Model Registry.
+4. Containerization: Seluruh komponen aplikasi, termasuk API, sistem monitoring, dan visualisasi, dibungkus dalam kontainer menggunakan Docker dan diorkestrasi dengan Docker Compose. Ini mencakup layanan untuk:
 
-- Git
-- Python 3.9+
-- Docker Desktop
+- - app: Aplikasi utama dengan API (FastAPI) dan UI (Gradio).
+- - prometheus: Untuk scraping dan penyimpanan metrik.
+- - grafana: Untuk visualisasi dasbor dan alerting.
 
-2. Instalasi Proyek
+5. Monitoring & Logging: Prometheus memantau endpoint metrik dari aplikasi untuk melacak fitur-fitur input secara real-time.
+6. Alerting: Grafana digunakan untuk membuat dasbor visualisasi dari data Prometheus. Sistem alert dikonfigurasi untuk mengirim notifikasi ke Slack melalui webhook ketika nilai metrik melewati ambang batas yang ditentukan (data drift terdeteksi).
+7. Retraining Model: Jika drift terdeteksi, proses pelatihan ulang dapat dijalankan menggunakan data gabungan (data lama + data baru) untuk menghasilkan versi model yang lebih baik. Model baru ini kemudian didaftarkan kembali di MLflow Registry dan siap untuk di-deploy.
 
-- Salin repositori ini ke komputer dan install semua library yang dibutuhkan.
+---
 
-### 1. Clone repositori dari GitHub
+#### 🛠️ Teknologi yang Digunakan
 
-- **git clone https://github.com/QAmatAS/HeartDisesaseDetection.git**
+- Data Synthesis: ctgan
+- Data & Model Versioning: DVC, MLflow
+- ML Framework: scikit-learn
+- API & Web App: FastAPI, Gradio
+- Containerization: Docker, Docker Compose
+- Monitoring: Prometheus
+- Visualisasi & Alerting: Grafana
+- Notifikasi: Slack
+- CI/CD & Hosting: Dagshub, GitHub
 
-### 2. Masuk ke direktori proyek
+---
 
-- **cd HeartDisesaseDetection**
+#### 🚀 Instalasi dan Menjalankan Proyek
 
-### 3. Buat dan aktifkan virtual environment
+Untuk menjalankan tumpukan penuh (full stack) dari proyek ini, ikuti langkah-langkah berikut:
 
-Di Mac/Linux:
+1. **Clone Repositori**
 
-- **python3 -m venv venv**
-- **source venv/bin/activate**
+- - git clone https://github.com/NalendraMarchelo/HeartDiseaseDetection.git
+- - cd HeartDiseaseDetection
 
-Di Windows:
+2. **Setup Environment Variables**
+   Buat file .env dan isi dengan konfigurasi yang diperlukan, seperti DAGSHUB_TOKEN jika diperlukan.
+3. **Tarik Data dengan DVC**
+   Pastikan DVC terinstal, lalu jalankan:
 
-- **python -m venv venv**
-- **venv\Scripts\activate**
+- - dvc pull
 
-### 4. Install semua library yang diperlukan
+4. **jalankan Semua Layanan dengan Docker Compose**
+   Pastikan Docker Desktop sudah berjalan. Kemudian, bangun dan jalankan semua kontainer:
 
-- **pip install -r requirements.txt**
-  📊 Eksplorasi & Pelatihan Model (Menggunakan Notebook)
-  Untuk memahami data dan logika model, bisa membuka dan menjalankan file notebook.ipynb.
+- - docker-compose up --build
 
-#### 🐳 Menjalankan Aplikasi dengan Docker (Lokal)
+5. **Akses Layanan**
+   Setelah semua kontainer berjalan, Anda dapat mengakses layanan berikut:
 
-Cara menjalankan aplikasi seperti saat di-deployment.
+- - - Aplikasi Prediksi (Gradio UI): http://localhost:7860
+- - - API Docs (FastAPI): http://localhost:8000/docs
+- - - Prometheus UI: http://localhost:9090
+- - - Grafana UI: http://localhost:3000
+- - - MLflow UI: http://localhost:5000
 
-1. Hentikan dan Hapus Container Lama (Jika Ada)
-   Jika pernah menjalankan container ini sebelumnya, bersihkan dulu untuk menghindari error.
+---
 
-- **docker stop heart-disease-container**
-- **docker rm heart-disease-container**
+#### 🔬 Menjalankan Pipeline Secara Manual
 
-2. Bangun (Build) Image Docker
-   Perintah ini akan membaca Dockerfile untuk membangun image yang berisi semua yang dibutuhkan aplikasi. Proses ini juga akan melatih model secara otomatis (--train).
+Anda juga bisa menjalankan setiap langkah secara individual.
 
-- **docker build -t heart-disease-app .**
+1. Pelatihan Model Awal
 
-3. Jalankan (Run) Container Docker
-   Setelah image berhasil dibuat, jalankan sebagai container.
-   Opsi --rm akan otomatis menghapus container saat dihentikan
+- - python src/app.py dan train.py
 
-- **docker run --rm -p 7860:7860 --name heart-disease-container heart-disease-app**
+2. Memulai UI Pelacakan Eksperimen
 
-4. Akses Aplikasi
-   Buka browser web dan kunjungi alamat http://localhost:7860.
+- - mlflow ui
 
-#### ⚙️ Alur Kerja CI/CD (Otomatisasi)
+3. Simulasi Prediksi untuk Menghasilkan Metrik
+   Interaksi dengan UI Gradio di
 
-Proyek ini menggunakan GitHub Actions untuk proses Continuous Integration/Continuous Deployment (CI/CD).
+- - http://localhost:7860 untuk membuat prediksi. Aksi ini akan menghasilkan metrik yang akan di-scrape oleh Prometheus.
 
-- Pemicu (Trigger): Setiap kali ada push ke branch main.
-- Aksi (Action): GitHub akan secara otomatis mengambil seluruh kode dari repositori dan menyalinnya (sync) ke Hugging Face Space yang telah dikonfigurasi.
-- Kebutuhan: Proses ini memerlukan secret bernama HF_TOKEN yang disimpan di Settings > Secrets and variables > Actions pada repositori ini.
+4. Pelatihan Ulang (Retraining) saat Drift Terdeteksi
+   Setelah mendapatkan notifikasi drift di Slack, jalankan skrip pelatihan ulang dengan data baru.
 
-#### 👥 Tim Pengembang
+- - python train.py --data-path data/Heart_Disease_Prediction_Combined.csv --model-name "HeartDiseaseClassifier-Retrained"
 
-- 225150207111001 - Muhammad Nadhif
-- 225150201111002 - Nalendra Machelo
-- 225150200111005 - Narendra Atha Abhinaya
-- 225150200111003 - Yosua Samuel Edlyn Sinaga
+---
+
+#### 📈 Hasil Eksperimen
+
+Model dievaluasi menggunakan beberapa metrik. Berikut adalah hasil dari model
+
+RandomForest yang dicatat oleh MLflow:
+
+- Accuracy: 0.759
+- Precision: 0.764
+- Recall: 0.989
+- F1-score: 0.862
+
+Setelah retraining dengan data gabungan, performa model meningkat:
+
+- Accuracy: 0.843
+- Precision: 0.829
+- Recall: 0.965
+- F1-score: 0.892
+
+---
+
+#### Link
+
+- Link Github:
+  https://github.com/NalendraMarchelo/HeartDiseaseDetection
+- Link Hugging Face:
+  https://huggingface.co/spaces/NalendraMarchelo/Heart-Disease-Prediction
+- Link Dagshub:
+  https://dagshub.com/NalendraMarchelo/HeartDiseaseDetection
+- Link Slack:
+  https://join.slack.com/t/mlops-semesterantara/shared_invite/zt-39nqr1yfn-5I8Ttn_TjZ_SwbbYoAfC5A
+
+---
+
+#### 👥 Kontributor
+
+Proyek ini dikerjakan oleh kelompok mahasiswa dari Fakultas Ilmu Komputer, Universitas Brawijaya sebagai bagian dari mata kuliah Machine Learning Operations.
+
+Muhammad Nadhif (225150207111001)
+
+Nalendra Machelo (225150201111002)
+
+Narendra Atha Abhinaya (225150200111005)
+
+Yosua Samuel Edlyn Sinaga (225150200111003)
+
+---
+
+#### Dosen Pengampu
+
+Putra Pandu Adikara, S.Kom., M.Kom.
