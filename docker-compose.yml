@@ -1,42 +1,4 @@
 services:
-  # mlflow-server:
-  #   image: ghcr.io/mlflow/mlflow:v2.13.2
-  #   ports:
-  #     - "5000:5000"
-  #   volumes:
-  #     - ./mlruns:/mlruns
-  #   command: >
-  #     mlflow server
-  #     --host 0.0.0.0
-  #     --port 5000
-  #     --backend-store-uri sqlite:////mlruns/mlflow.db
-  #     --default-artifact-root /mlruns
-  #     --serve-artifacts
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #   networks:
-  #     - mlops-net
-
-  # # Layanan mlflow-serving tidak lagi diperlukan karena app.py akan mengekspos metrik
-  # # mlflow-serving:
-  # #   image: ghcr.io/mlflow/mlflow:v2.13.2
-  # #   ports:
-  # #     - "8001:8001"
-  # #     - "8081:8081"
-  # #   volumes:
-  # #     - ./mlruns:/mlruns
-  # #   environment:
-  # #     - MLFLOW_TRACKING_URI=http://mlflow-server:5000
-  # #     - MODEL_URI=models:/HeartDiseaseClassifier/Production
-  # #   command: mlflow models serve --model-uri ${MODEL_URI} --host 0.0.0.0 --port 8001 --enable-mlserver
-  # #   depends_on:
-  # #     - mlflow-server
-  # #   networks:
-  # #     - mlops-net
-
   app:
     build:
       context: .
@@ -45,18 +7,9 @@ services:
       - "7860:7860" # Port untuk Gradio UI
       - "8000:8000" # Port untuk metrik Prometheus
     environment:
-      # - MLFLOW_TRACKING_URI=http://mlflow-server:5000
-      # meneruskan token DagsHub di sini jika diperlukan untuk deployment
       - DAGSHUB_TOKEN=${DAGSHUB_TOKEN}
-    volumes:
-      # - ./data:/app/data
-      # - ./scaler.joblib:/app/scaler.joblib
-      # - ./imputer.joblib:/app/imputer.joblib
-    # depends_on:
-    #   mlflow-server:
-    #     condition: service_healthy
-    # networks:
-    #   - mlops-net
+    networks:
+      - mlops-net
 
   prometheus:
     image: prom/prometheus:latest
