@@ -45,3 +45,11 @@ jobs:
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: python promote_model.py
+
+      - name: Trigger Model Reload in Application
+        run: |
+          # Perintah curl ini akan "mengetuk" endpoint /reload di layanan 'app' Anda
+          # Perlu waktu beberapa detik agar layanan siap setelah docker-compose up
+          echo "Menunggu aplikasi siap..."
+          sleep 15 
+          curl -X POST http://app:8000/reload

@@ -13,6 +13,10 @@ import threading
 from flask import Flask, Response
 from prometheus_client import Gauge, generate_latest, REGISTRY
 
+model = None
+scaler = None
+imputer = None
+
 # --- 1. SETUP PROMETHEUS METRICS ---
 # Mendefinisikan metrik untuk memonitor nilai fitur yang masuk
 PREDICTION_GAUGE = Gauge('prediction_feature_value', 'Last value of a feature for prediction', ['feature_name'])
@@ -23,6 +27,49 @@ flask_app = Flask(__name__)
 @flask_app.route("/metrics")
 def get_metrics():
     return Response(generate_latest(REGISTRY), mimetype="text/plain")
+
+def load_model_and_preprocessors():
+    """
+    Fungsi ini memuat model "Production" terbaru dan preprocessor-nya dari MLflow/DagsHub.
+    """
+    global model, scaler, imputer
+    try:
+        MODEL_NAME = "HeartDiseaseClassifier"
+        MODEL_STAGE = "Production"
+        model_uri = f"models:/{MODEL_NAME}/{MODEL_STAGE}"
+        
+        print(f"Memuat model dari: {model_uri}")
+        model = mlflow.pyfunc.load_model(model_uri)
+        
+        client = mlflow.tracking.MlflowClient()
+        latest_version = client.get_latest_versions(name=MODEL_NAME, stages=[MODEL_STAGE])[0]
+        run_id = latest_version.run_id
+        
+        print(f"Mengunduh preprocessor dari run ID: {run_id}")
+        client.download_artifacts(run_id=run_id, path="scaler.joblib", dst_path=".")
+        client.download_artifacts(run_id=run_id, path="imputer.joblib", dst_path=".")
+
+        scaler = joblib.load("scaler.joblib")
+        imputer = joblib.load("imputer.joblib")
+        
+        print("Model dan preprocessor berhasil dimuat.")
+        return True, f"Model version {latest_version.version} loaded successfully."
+
+    except Exception as e:
+        error_message = f"Error saat memuat model atau preprocessor: {e}"
+        print(error_message)
+        # Jangan sys.exit(1) agar aplikasi tetap berjalan jika reload gagal
+        return False, error_message
+
+# --- ENDPOINT BARU UNTUK RELOAD MODEL ---
+@flask_app.route("/reload", methods=["POST"])
+def reload_model_endpoint():
+    print("Menerima permintaan untuk me-reload model...")
+    success, message = load_model_and_preprocessors()
+    if success:
+        return jsonify({"status": "success", "message": message}), 200
+    else:
+        return jsonify({"status": "error", "message": message}), 500
 
 # --- 2. KONFIGURASI DAN PEMUATAN MODEL ---
 def setup_mlflow_tracking():
@@ -68,14 +115,14 @@ except Exception as e:
     sys.exit(1)
 
 def log_prediction_data(feature_dict):
-         """Mencatat data prediksi baru ke file log."""
-log_file = 'data/new_logs.csv'
-df_new = pd.DataFrame([feature_dict])
+    """Mencatat data prediksi baru ke file log."""
+    log_file = 'data/new_logs.csv'
+    df_new = pd.DataFrame([feature_dict])
     
     # Jika file sudah ada, tambahkan tanpa header. Jika tidak, buat baru dengan header.
-if os.path.exists(log_file):
+    if os.path.exists(log_file):
         df_new.to_csv(log_file, mode='a', header=False, index=False)
-else:
+    else:
         df_new.to_csv(log_file, index=False)
 
 # --- 3. FUNGSI PREDIKSI (DENGAN LOGGING METRIK) ---
@@ -102,7 +149,6 @@ def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_1
     # Prediksi
     prediction = model.predict(input_processed)[0]
     return "Berisiko Tinggi (Presence)" if prediction == 1 else "Berisiko Rendah (Absence)"
-
 
 # --- 4. ANTARMUKA GRADIO ---
 def create_gradio_interface():
@@ -171,13 +217,20 @@ def create_gradio_interface():
 
 # --- 5. BLOK EKSEKUSI UTAMA ---
 if __name__ == "__main__":
+    print("Melakukan pemuatan model awal...")
+    initial_load_success, _ = load_model_and_preprocessors()
+    if not initial_load_success:
+        print("Gagal memuat model saat startup. Aplikasi akan berhenti.")
+        sys.exit(1)
+
     def run_flask():
+        # Port 8000 untuk Flask (metrics dan reload)
         flask_app.run(host='0.0.0.0', port=8000)
 
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
-    print("Flask server untuk Prometheus metrics berjalan di port 8000.")
+    print("Flask server untuk Prometheus & Reload berjalan di port 8000.")
 
     print("Menjalankan aplikasi Gradio...")
     demo = create_gradio_interface()
