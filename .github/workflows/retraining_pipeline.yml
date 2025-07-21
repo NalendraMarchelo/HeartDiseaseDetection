@@ -1,5 +1,3 @@
-# .github/workflows/retraining_pipeline.yml
-
 name: Automated Model Retraining
 
 on:
@@ -9,7 +7,6 @@ on:
 jobs:
   retrain:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -22,12 +19,12 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      #  - name: Combine Datasets for Retraining
-      #    working-directory: ./
-      #    run: python combine_data.py
-
       - name: Run Training Script
-        working-directory: ./
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: python train.py --dataset data/combined_data.csv --run_name "Automated Retraining via GitHub Actions"
+
+      - name: Promote Model to Production
+        env:
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: python promote_model.py
