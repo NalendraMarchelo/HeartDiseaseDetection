@@ -22,18 +22,20 @@ def get_metrics():
 
 # --- 2. KONFIGURASI DAN PEMUATAN MODEL ---
 def setup_mlflow_tracking():
-    """Mengatur koneksi ke MLflow Tracking Server (DagsHub atau lokal)."""
-    DAGSHUB_USER = "NalendraMarchelo"
-    DAGSHUB_REPO = "HeartDiseaseDetection"
+    MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    print(f"Menggunakan MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
     
+    """Mengatur koneksi ke MLflow Tracking Server (DagsHub atau lokal)."""
     if os.getenv("DAGSHUB_TOKEN"):
         print("Menggunakan DagsHub MLflow Tracking Server...")
+        DAGSHUB_USER = "NalendraMarchelo"
+        DAGSHUB_REPO = "HeartDiseaseDetection"
         os.environ['MLFLOW_TRACKING_USERNAME'] = DAGSHUB_USER
         os.environ['MLFLOW_TRACKING_PASSWORD'] = os.getenv("DAGSHUB_TOKEN")
         mlflow.set_tracking_uri(f"https://dagshub.com/{DAGSHUB_USER}/{DAGSHUB_REPO}.mlflow")
     else:
         print("Menggunakan MLflow Tracking Server lokal...")
-        mlflow.set_tracking_uri("http://localhost:5000")
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 setup_mlflow_tracking()
 
