@@ -1,4 +1,4 @@
-# .github/workflows/retraining_pipeline.yml (Versi Final Sederhana - Tanpa DVC)
+# .github/workflows/retraining_pipeline.yml
 
 name: Automated Model Retraining
 
@@ -21,14 +21,17 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      #  - name: Combine Datasets for Retraining
-      #    run: python combine_data.py
+      # LANGKAH BARU: Unduh data langsung dari DagsHub
+      - name: Download Training Data
+        run: python download_data.py
+
+      - name: Combine Datasets for Retraining
+        run: python combine_data.py
 
       - name: Run Training Script
         env:
-          # Menggunakan secret yang sudah Anda simpan di GitHub
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: python train.py --dataset data/combined_data.csv --run_name "Automated Retraining via GitHub Actions"
+        run: python train.py --dataset data/combined_data.csv --run_name "Automated Retraining"
 
       - name: Promote New Model to Production
         env:
