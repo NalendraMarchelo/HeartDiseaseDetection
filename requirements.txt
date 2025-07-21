@@ -11,3 +11,5 @@ mlflow==2.13.2
 
 # Web App
 gradio
+
+evidently==0.4.0

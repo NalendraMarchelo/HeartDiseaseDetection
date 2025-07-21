@@ -12,6 +12,8 @@ services:
       --backend-store-uri sqlite:////mlruns/mlflow.db
       --default-artifact-root /mlruns
       --serve-artifacts
+    networks: # <-- Add this
+      - mlops-net
 
   mlflow-serving:
     image: ghcr.io/mlflow/mlflow:v2.13.2
@@ -23,10 +25,11 @@ services:
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow-server:5000
       - MODEL_URI=models:/HeartDiseaseClassifier/Production
-    command: >
-      mlflow models serve --model-uri "$${MODEL_URI}" --host 0.0.0.0 --port 8001 --enable-mlserver
+    command: mlflow models serve --model-uri ${MODEL_URI} --host 0.0.0.0 --port 8001 --enable-mlserver
     depends_on:
       - mlflow-server
+    networks:
+      - mlops-net
 
   app:
     build:
@@ -37,12 +40,14 @@ services:
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow-server:5000
     volumes:
-      - ./data:/app/data # Volume untuk data training
+      - ./data:/app/data
       - ./scaler.joblib:/app/scaler.joblib
       - ./imputer.joblib:/app/imputer.joblib
     depends_on:
       - mlflow-server
       - mlflow-serving
+    networks: # <-- Add this
+      - mlops-net
 
   prometheus:
     image: prom/prometheus:latest
@@ -52,6 +57,8 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     depends_on:
       - mlflow-serving
+    networks: # <-- Add this
+      - mlops-net
 
   grafana:
     image: grafana/grafana-oss:latest
@@ -61,3 +68,10 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
+    networks: # <-- Add this
+      - mlops-net
+
+# Add this entire block to the end of the file
+networks:
+  mlops-net:
+    driver: bridge
