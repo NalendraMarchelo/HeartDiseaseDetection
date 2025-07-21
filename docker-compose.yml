@@ -22,9 +22,9 @@ services:
       - ./mlruns:/mlruns
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow-server:5000
-      - MODEL_URI=models:/HeartDiseaseClassifier/Production
+      # - MODEL_URI=.model/HeartDiseaseClassifier
     command: >
-      mlflow models serve --model-uri "$${MODEL_URI}" --host 0.0.0.0 --port 8001 --enable-mlserver
+      mlflow models serve --model-uri ./model/random_forest_heart_disease.joblib --host 0.0.0.0 --port 8001 --enable-mlserver
     depends_on:
       - mlflow-server
 

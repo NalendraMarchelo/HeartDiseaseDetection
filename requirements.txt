@@ -3,7 +3,7 @@
 # Core Data Science & ML
 pandas
 scikit-learn
-numpy
+numpy	
 joblib
 
 # MLOps Tools

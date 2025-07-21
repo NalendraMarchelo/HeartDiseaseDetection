@@ -13,7 +13,8 @@ SCALER_PATH = "scaler.joblib"
 IMPUTER_PATH = "imputer.joblib"
 MODEL_NAME = "HeartDiseaseClassifier"
 MODEL_STAGE = "Production"
-model_uri = f"models:/{MODEL_NAME}/{MODEL_STAGE}"
+model_uri = f"model/{MODEL_NAME}"
+# model_uri = f"models:/{MODEL_NAME}/{MODEL_STAGE}"
 
 try:
     print(f"Memuat model dari: {model_uri}")
