@@ -9,20 +9,19 @@ import mlflow.pyfunc
 import joblib
 import os
 import sys
+import time
 import threading
+import logging
 from flask import Flask, Response
 from prometheus_client import Gauge, generate_latest, REGISTRY
 
-model = None
-scaler = None
-imputer = None
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # --- 1. SETUP PROMETHEUS METRICS ---
-# Mendefinisikan metrik untuk memonitor nilai fitur yang masuk
 PREDICTION_GAUGE = Gauge('prediction_feature_value', 'Last value of a feature for prediction', ['feature_name'])
 print("Metrik Prometheus didefinisikan.")
 
-# Membuat aplikasi Flask terpisah untuk menyajikan endpoint /metrics
 flask_app = Flask(__name__)
 @flask_app.route("/metrics")
 def get_metrics():
@@ -32,34 +31,72 @@ def load_model_and_preprocessors():
     """
     Fungsi ini memuat model "Production" terbaru dan preprocessor-nya dari MLflow/DagsHub.
     """
-    global model, scaler, imputer
+    global model, scaler, imputer   
     try:
         MODEL_NAME = "HeartDiseaseClassifier"
         MODEL_STAGE = "Production"
         model_uri = f"models:/{MODEL_NAME}/{MODEL_STAGE}"
         
-        print(f"Memuat model dari: {model_uri}")
-        model = mlflow.pyfunc.load_model(model_uri)
-        
+        logger.info(f"Memuat model dari: {model_uri}")
+        new_model = mlflow.pyfunc.load_model(model_uri) # Muat ke variabel lokal dulu
+
         client = mlflow.tracking.MlflowClient()
         latest_version = client.get_latest_versions(name=MODEL_NAME, stages=[MODEL_STAGE])[0]
         run_id = latest_version.run_id
         
-        print(f"Mengunduh preprocessor dari run ID: {run_id}")
+        logger.info(f"Mengunduh preprocessor dari run ID: {run_id}")
+        # Mengunduh ke lokasi sementara atau dalam memori jika memungkinkan
+        # Untuk kesederhanaan, kita tetap unduh ke root dir
         client.download_artifacts(run_id=run_id, path="scaler.joblib", dst_path=".")
         client.download_artifacts(run_id=run_id, path="imputer.joblib", dst_path=".")
 
-        scaler = joblib.load("scaler.joblib")
-        imputer = joblib.load("imputer.joblib")
+        new_scaler = joblib.load("scaler.joblib")
+        new_imputer = joblib.load("imputer.joblib")
         
-        print("Model dan preprocessor berhasil dimuat.")
+        # Hanya ganti model dan preprocessor global jika berhasil semua
+        model = new_model
+        scaler = new_scaler
+        imputer = new_imputer
+
+        logger.info("Model dan preprocessor berhasil dimuat.")
         return True, f"Model version {latest_version.version} loaded successfully."
 
     except Exception as e:
         error_message = f"Error saat memuat model atau preprocessor: {e}"
-        print(error_message)
-        # Jangan sys.exit(1) agar aplikasi tetap berjalan jika reload gagal
+        logger.error(error_message)
         return False, error_message
+
+# --- FUNGSI BARU: Pengecekan Model Berkala ---
+def check_for_model_updates(interval_seconds=600): # Cek setiap 10 menit (600 detik)
+    global model, scaler, imputer
+    MODEL_NAME = "HeartDiseaseClassifier"
+    MODEL_STAGE = "Production"
+
+    while True:
+        try:
+            client = mlflow.tracking.MlflowClient()
+            latest_prod_version_in_registry = client.get_latest_versions(name=MODEL_NAME, stages=[MODEL_STAGE])[0]
+
+            current_run_id = getattr(model, '_run_id', None) 
+            
+            if current_run_id != latest_prod_version_in_registry.run_id:
+                logger.info(f"Model baru terdeteksi di Dagshub! Versi saat ini: {current_run_id}, Versi terbaru: {latest_prod_version_in_registry.run_id}")
+                success, message = load_model_and_preprocessors()
+                if success:
+                    # Perbarui atribut run_id pada model yang baru dimuat
+                    model._run_id = latest_prod_version_in_registry.run_id
+                    logger.info(f"Berhasil memuat model versi terbaru: {latest_prod_version_in_registry.version}")
+                else:
+                    logger.error(f"Gagal memuat model terbaru: {message}")
+            else:
+                logger.info(f"Model saat ini sudah yang terbaru. Versi: {latest_prod_version_in_registry.version}")
+
+        except Exception as e:
+            logger.error(f"Error saat mengecek update model: {e}")
+        
+        time.sleep(interval_seconds)
+
+
 
 
 # --- 2. KONFIGURASI DAN PEMUATAN MODEL ---
@@ -92,6 +129,7 @@ try:
     client = mlflow.tracking.MlflowClient()
     latest_version = client.get_latest_versions(name=MODEL_NAME, stages=[MODEL_STAGE])[0]
     run_id = latest_version.run_id
+    model._run_id = latest_version.run_id
     
     print(f"Mengunduh preprocessor dari run ID: {run_id}")
     client.download_artifacts(run_id=run_id, path="scaler.joblib", dst_path=".")
@@ -208,21 +246,35 @@ def create_gradio_interface():
 
 # --- 5. BLOK EKSEKUSI UTAMA ---
 if __name__ == "__main__":
-    print("Melakukan pemuatan model awal...")
-    initial_load_success, _ = load_model_and_preprocessors()
+    logger.info("Melakukan pemuatan model awal...")
+    initial_load_success, message = load_model_and_preprocessors() # Gunakan fungsi ini
     if not initial_load_success:
-        print("Gagal memuat model saat startup. Aplikasi akan berhenti.")
+        logger.error(f"Gagal memuat model saat startup: {message}. Aplikasi akan berhenti.")
         sys.exit(1)
+    else:
+        # PENTING: Setelah pemuatan model awal, simpan run_id model yang dimuat
+        client = mlflow.tracking.MlflowClient()
+        latest_version = client.get_latest_versions(name="HeartDiseaseClassifier", stages=["Production"])[0]
+        # Pastikan 'model' tidak None di sini sebelum menambahkan atribut
+        if model:
+            model._run_id = latest_version.run_id
+            logger.info(f"Model awal berhasil dimuat: versi {latest_version.version}, run_id {latest_version.run_id}")
+
 
     def run_flask():
-        # Port 8000 untuk Flask (metrics dan reload)
         flask_app.run(host='0.0.0.0', port=8000)
 
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
-    print("Flask server untuk Prometheus & Reload berjalan di port 8000.")
+    logger.info("Flask server untuk Prometheus berjalan di port 8000.")
 
-    print("Menjalankan aplikasi Gradio...")
+    # Mulai thread untuk pengecekan update model
+    model_update_thread = threading.Thread(target=check_for_model_updates, args=(600,)) # Cek setiap 10 menit
+    model_update_thread.daemon = True
+    model_update_thread.start()
+    logger.info("Thread pengecekan update model berjalan.")
+
+    logger.info("Menjalankan aplikasi Gradio...")
     demo = create_gradio_interface()
     demo.launch(server_name="0.0.0.0", server_port=7860)
