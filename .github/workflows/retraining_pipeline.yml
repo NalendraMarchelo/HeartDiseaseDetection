@@ -18,30 +18,81 @@ jobs:
           python-version: "3.9"
 
       - name: Install Dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          # Tambahkan library lain jika diperlukan oleh train.py, promote_model.py, atau update_dataset.py
+          # Contoh: pip install mlflow boto3 paramiko dvc
+          # (sesuaikan dengan requirements.txt Anda)
+
+      # --- START: Penambahan dan Perbaikan ---
+      - name: Log Grafana Payload Details
+        run: |
+          echo "Received GitHub repository_dispatch event with client_payload:"
+          echo "Status: ${{ github.event.client_payload.grafana_alert_status }}"
+          echo "Alert Name: ${{ github.event.client_payload.grafana_alert_name }}"
+          echo "Feature Name: ${{ github.event.client_payload.grafana_feature_name }}"
+          echo "Metric Type: ${{ github.event.client_payload.grafana_metric_type }}"
+          echo "Value: ${{ github.event.client_payload.grafana_value }}"
+          echo "Dashboard URL: ${{ github.event.client_payload.grafana_dashboard_url }}"
+          echo "Panel URL: ${{ github.event.client_payload.grafana_panel_url }}"
+        # Catatan: Variabel diakses via github.event.client_payload.<nama_kunci>
 
       - name: Update Training Dataset
         run: python update_dataset.py
+        # update_dataset.py seharusnya sudah menggabungkan new_logs.csv ke combined_data.csv
+        # dan menghapus new_logs.csv. Jadi, setelah ini, new_logs.csv TIDAK ADA.
 
       - name: Commit and Push Updated Data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Menggunakan token bawaan GITHUB_TOKEN
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-          if [ -f "data/new_logs.csv" ]; then
-            git add data/combined_data.csv data/new_logs.csv
-            git commit -m "feat: Append new prediction logs to training data"
-            git push
+          # Cek apakah combined_data.csv benar-benar berubah sebelum commit
+          git add data/combined_data.csv
+          if git diff --staged --quiet data/combined_data.csv; then
+            echo "data/combined_data.csv has not changed. Skipping commit."
           else
-            echo "No new log file to commit."
+            # Gunakan info dari payload untuk pesan commit
+            FEATURE_NAME="${{ github.event.client_payload.grafana_feature_name }}"
+            METRIC_TYPE="${{ github.event.client_payload.grafana_metric_type }}"
+            ALERT_VALUE="${{ github.event.client_payload.grafana_value }}"
+            COMMIT_MESSAGE="feat: Update training data due to data drift in ${FEATURE_NAME} (${METRIC_TYPE} value: ${ALERT_VALUE})"
+            
+            git commit -m "${COMMIT_MESSAGE}"
+            git push
+            echo "Data update committed: ${COMMIT_MESSAGE}"
           fi
 
       - name: Run Training Script
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: python train.py --dataset data/combined_data.csv --run_name "Automated Retraining"
+          # Gunakan info dari payload untuk nama run MLflow
+          MLFLOW_RUN_NAME: "Automated Retraining - Drift on ${{ github.event.client_payload.grafana_feature_name }} (${{ github.event.client_payload.grafana_metric_type }} value: ${{ github.event.client_payload.grafana_value }})"
+        run: python train.py --dataset data/combined_data.csv --run_name "${MLFLOW_RUN_NAME}"
 
       - name: Promote New Model to Production
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: python promote_model.py
+
+      # --- END: Penambahan dan Perbaikan ---
+
+      # --- Deployment Trigger (Optional, jika ingin langsung dari GHA) ---
+      # Ini adalah bagian yang sebelumnya sudah kita bahas untuk memicu deploy.sh di server
+      # Jika Anda ingin deploy.sh dipicu oleh Alert Grafana dan BUKAN oleh GHA,
+      # maka bagian ini TIDAK DIPERLUKAN di workflow ini.
+      # Namun, jika Anda ingin GHA yang memicu deployment setelah retraining, maka sertakan ini.
+      - name: Trigger Deployment
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/deploy_key \
+              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} \
+              "cd /path/to/project && ./deploy.sh"
