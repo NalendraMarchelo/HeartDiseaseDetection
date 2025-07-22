@@ -34,7 +34,6 @@ jobs:
             git push
           else
             echo "No new log file to commit."
-          fi
 
       - name: Run Training Script
         env:
@@ -45,3 +44,14 @@ jobs:
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: python promote_model.py
+
+      - name: Trigger Deployment
+        env:
+          RELOAD_SECRET: ${{ secrets.RELOAD_SECRET_TOKEN }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          curl -X POST \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token YOUR_GITHUB_TOKEN" \
+          https://api.github.com/repos/NalendraMarchelo/HeartDiseasesDetection/dispatches \
+               -d '{"event_type": "trigger-retraining", "client_payload": {"message": "New data available for retraining"}}'
