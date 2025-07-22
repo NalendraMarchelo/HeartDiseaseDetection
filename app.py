@@ -177,6 +177,14 @@ def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_1
     
     # Prediksi
     prediction = model.predict(input_processed)[0]
+    
+    # --- BAGIAN INI UNTUK MENCATAT LOG PREDIKSI ---
+    prediction_result = "Presence" if prediction == 1 else "Absence"
+    log_entry = dict(zip(feature_names, input_values))
+    log_entry['Prediction'] = prediction_result 
+    log_prediction_data(log_entry)
+    # --------------------------------------------------------    
+    
     return "Berisiko Tinggi (Presence)" if prediction == 1 else "Berisiko Rendah (Absence)"
 
 # --- 4. ANTARMUKA GRADIO ---
