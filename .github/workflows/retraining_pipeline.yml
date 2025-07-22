@@ -76,23 +76,3 @@ jobs:
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: python promote_model.py
-
-      # --- END: Penambahan dan Perbaikan ---
-
-      # --- Deployment Trigger (Optional, jika ingin langsung dari GHA) ---
-      # Ini adalah bagian yang sebelumnya sudah kita bahas untuk memicu deploy.sh di server
-      # Jika Anda ingin deploy.sh dipicu oleh Alert Grafana dan BUKAN oleh GHA,
-      # maka bagian ini TIDAK DIPERLUKAN di workflow ini.
-      # Namun, jika Anda ingin GHA yang memicu deployment setelah retraining, maka sertakan ini.
-      - name: Trigger Deployment
-        env:
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          ssh -o StrictHostKeyChecking=no \
-              -i ~/.ssh/deploy_key \
-              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} \
-              "cd /path/to/project && ./deploy.sh"
