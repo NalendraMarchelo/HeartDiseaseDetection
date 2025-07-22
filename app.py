@@ -14,18 +14,27 @@ import threading
 import logging
 from flask import Flask, Response
 from prometheus_client import Gauge, generate_latest, REGISTRY
+from scipy.stats import wasserstein_distance, ks_2samp # Import untuk perhitungan drift
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- 1. SETUP PROMETHEUS METRICS ---
 PREDICTION_GAUGE = Gauge('prediction_feature_value', 'Last value of a feature for prediction', ['feature_name'])
+# Metrik baru untuk data drift
+DATA_DRIFT_GAUGE = Gauge('data_drift_score', 'Data drift score for a feature', ['feature_name', 'metric_type'])
 print("Metrik Prometheus didefinisikan.")
 
 flask_app = Flask(__name__)
 @flask_app.route("/metrics")
 def get_metrics():
     return Response(generate_latest(REGISTRY), mimetype="text/plain")
+
+# Variabel global untuk model, preprocessor, dan data referensi
+model = None
+scaler = None
+imputer = None
+REFERENCE_DATA = None # Akan diisi dengan data training awal
 
 def load_model_and_preprocessors():
     """
@@ -41,6 +50,7 @@ def load_model_and_preprocessors():
         new_model = mlflow.pyfunc.load_model(model_uri) # Muat ke variabel lokal dulu
 
         client = mlflow.tracking.MlflowClient()
+        # Menggunakan get_latest_versions yang akan deprecated, tapi masih berfungsi
         latest_version = client.get_latest_versions(name=MODEL_NAME, stages=[MODEL_STAGE])[0]
         run_id = latest_version.run_id
         
@@ -67,7 +77,7 @@ def load_model_and_preprocessors():
         return False, error_message
 
 # --- FUNGSI BARU: Pengecekan Model Berkala ---
-def check_for_model_updates(interval_seconds=180): # detik
+def check_for_model_updates(interval_seconds=600): # Cek setiap 10 menit
     global model, scaler, imputer
     MODEL_NAME = "HeartDiseaseClassifier"
     MODEL_STAGE = "Production"
@@ -96,52 +106,112 @@ def check_for_model_updates(interval_seconds=180): # detik
         
         time.sleep(interval_seconds)
 
+# --- FUNGSI BARU: Perhitungan Data Drift ---
+def calculate_data_drift(reference_df, current_df, feature_names_to_monitor):
+    """
+    Menghitung metrik data drift (Wasserstein Distance dan KS Statistic p-value)
+    untuk fitur-fitur tertentu dan mengirimkannya ke Prometheus.
+    """
+    logger.info("Memulai perhitungan data drift...")
+    for feature in feature_names_to_monitor:
+        if feature in reference_df.columns and feature in current_df.columns:
+            # Pastikan data numerik dan handle non-numerik jika ada
+            ref_data = pd.to_numeric(reference_df[feature], errors='coerce').dropna()
+            curr_data = pd.to_numeric(current_df[feature], errors='coerce').dropna()
 
+            if not ref_data.empty and not curr_data.empty:
+                try:
+                    # Wasserstein Distance
+                    wd = wasserstein_distance(ref_data, curr_data)
+                    DATA_DRIFT_GAUGE.labels(feature_name=feature, metric_type='wasserstein_distance').set(wd)
+                    logger.info(f"Drift untuk {feature} (Wasserstein): {wd:.4f}")
+
+                    # Kolmogorov-Smirnov Test (p-value)
+                    # ks_2samp membutuhkan setidaknya 2 sampel di setiap array
+                    if len(ref_data) >= 2 and len(curr_data) >= 2:
+                        ks_stat, p_value = ks_2samp(ref_data, curr_data)
+                        DATA_DRIFT_GAUGE.labels(feature_name=feature, metric_type='ks_p_value').set(p_value)
+                        # Catatan: p-value rendah (<0.05) menunjukkan perbedaan distribusi yang signifikan (drift)
+                        logger.info(f"Drift untuk {feature} (KS p-value): {p_value:.4f}")
+                    else:
+                        logger.warning(f"Tidak cukup sampel untuk KS test pada fitur {feature}. Min 2 sampel diperlukan.")
+
+                except Exception as e:
+                    logger.warning(f"Gagal menghitung drift untuk fitur {feature}: {e}")
+            else:
+                logger.warning(f"Data referensi atau saat ini kosong untuk fitur {feature}. Tidak dapat menghitung drift.")
+        else:
+            logger.warning(f"Fitur '{feature}' tidak ditemukan di data referensi atau data saat ini.")
+    logger.info("Perhitungan data drift selesai.")
+
+# --- FUNGSI BARU: Pengecekan Data Drift Berkala ---
+def check_for_data_drift(interval_seconds=180): # Cek setiap 3 menit
+    global REFERENCE_DATA
+    data_dir = 'data'
+    logs_file = os.path.join(data_dir, 'new_logs.csv')
+    
+    # Fitur-fitur yang ingin dimonitor drift-nya (sesuaikan dengan dataset Anda)
+    # Ini adalah fitur-fitur numerik yang paling mungkin mengalami drift
+    # Pastikan nama-nama ini sesuai dengan kolom di old_data.csv / combined_data.csv
+    features_to_monitor = ['Age', 'BP', 'Cholesterol', 'Max HR', 'ST depression'] 
+
+    while True:
+        try:
+            if REFERENCE_DATA is None or REFERENCE_DATA.empty:
+                logger.warning("REFERENCE_DATA belum dimuat atau kosong. Melewatkan pengecekan drift.")
+                time.sleep(interval_seconds)
+                continue
+
+            if os.path.exists(logs_file) and os.path.getsize(logs_file) > 0:
+                logger.info(f"Mendeteksi data baru di {logs_file} untuk perhitungan drift.")
+                new_logs_df = pd.read_csv(logs_file)
+                
+                # Pastikan kolom-kolom yang relevan ada di new_logs_df sebelum memilih
+                # Jika ada kolom yang tidak ada, ini akan menyebabkan KeyError
+                missing_cols = [col for col in features_to_monitor if col not in new_logs_df.columns]
+                if missing_cols:
+                    logger.error(f"Kolom yang dimonitor tidak ditemukan di new_logs.csv: {missing_cols}. Melewatkan perhitungan drift.")
+                    time.sleep(interval_seconds)
+                    continue
+
+                current_data_for_drift = new_logs_df[features_to_monitor]
+                
+                calculate_data_drift(REFERENCE_DATA, current_data_for_drift, features_to_monitor)
+                
+                # Setelah diproses, hapus file new_logs.csv
+                os.remove(logs_file) 
+                logger.info(f"File {logs_file} telah diproses dan dihapus.")
+            else:
+                logger.info(f"Tidak ada data baru di {logs_file}. Melewatkan perhitungan drift.")
+        except pd.errors.EmptyDataError:
+            logger.warning(f"File {logs_file} kosong. Menghapus file kosong.")
+            # Hapus file kosong agar tidak terus-menerus dicek dan menyebabkan EmptyDataError
+            if os.path.exists(logs_file):
+                os.remove(logs_file)
+        except Exception as e:
+            logger.error(f"Error saat mengecek atau menghitung data drift: {e}")
+        
+        time.sleep(interval_seconds)
 
 
 # --- 2. KONFIGURASI DAN PEMUATAN MODEL ---
 def setup_mlflow_tracking():
     MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
-    print(f"Menggunakan MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
+    logger.info(f"Menggunakan MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
     
     """Mengatur koneksi ke MLflow Tracking Server (DagsHub atau lokal)."""
     if os.getenv("DAGSHUB_TOKEN"):
-        print("Menggunakan DagsHub MLflow Tracking Server...")
+        logger.info("Menggunakan DagsHub MLflow Tracking Server...")
         DAGSHUB_USER = "NalendraMarchelo"
         DAGSHUB_REPO = "HeartDiseaseDetection"
         os.environ['MLFLOW_TRACKING_USERNAME'] = DAGSHUB_USER
         os.environ['MLFLOW_TRACKING_PASSWORD'] = os.getenv("DAGSHUB_TOKEN")
         mlflow.set_tracking_uri(f"https://dagshub.com/{DAGSHUB_USER}/{DAGSHUB_REPO}.mlflow")
     else:
-        print("Menggunakan MLflow Tracking Server lokal...")
+        logger.info("Menggunakan MLflow Tracking Server lokal...")
         mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 setup_mlflow_tracking()
-
-try:
-    MODEL_NAME = "HeartDiseaseClassifier"
-    MODEL_STAGE = "Production"
-    model_uri = f"models:/{MODEL_NAME}/{MODEL_STAGE}"
-    
-    print(f"Memuat model dari: {model_uri}")
-    model = mlflow.pyfunc.load_model(model_uri)
-    
-    client = mlflow.tracking.MlflowClient()
-    latest_version = client.get_latest_versions(name=MODEL_NAME, stages=[MODEL_STAGE])[0]
-    run_id = latest_version.run_id
-    model._run_id = latest_version.run_id
-    
-    print(f"Mengunduh preprocessor dari run ID: {run_id}")
-    client.download_artifacts(run_id=run_id, path="scaler.joblib", dst_path=".")
-    client.download_artifacts(run_id=run_id, path="imputer.joblib", dst_path=".")
-
-    scaler = joblib.load("scaler.joblib")
-    imputer = joblib.load("imputer.joblib")
-    
-    print("Model dan preprocessor berhasil dimuat.")
-except Exception as e:
-    print(f"Error saat memuat model atau preprocessor: {e}")
-    sys.exit(1)
 
 def log_prediction_data(feature_dict):
     """Mencatat data prediksi baru ke file log."""
@@ -156,6 +226,8 @@ def log_prediction_data(feature_dict):
 
 # --- 3. FUNGSI PREDIKSI (DENGAN LOGGING METRIK) ---
 def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_120, EKG_results, Max_HR, Exercise_angina, ST_depression, Slope_of_ST, Number_of_vessels_fluro, Thallium):
+    global model, scaler, imputer # Pastikan variabel global digunakan
+
     feature_names = ['Age', 'Sex', 'Chest pain type', 'BP', 'Cholesterol', 'FBS over 120', 
                      'EKG results', 'Max HR', 'Exercise angina', 'ST depression', 'Slope of ST', 
                      'Number of vessels fluro', 'Thallium']
@@ -171,9 +243,28 @@ def predict_heart_disease(Age, Sex, Chest_pain_type, BP, Cholesterol, FBS_over_1
     input_data = pd.DataFrame([input_values], columns=feature_names)
     
     # Preprocessing
-    input_imputed = imputer.transform(input_data)
-    input_scaled = scaler.transform(input_imputed)
-    input_processed = pd.DataFrame(input_scaled, columns=feature_names)
+    # Pastikan imputer dan scaler sudah dimuat
+    if imputer is None or scaler is None or model is None:
+        logger.error("Model atau preprocessor belum dimuat. Tidak dapat melakukan prediksi.")
+        return "Error: Model tidak siap. Coba lagi nanti."
+
+    # Periksa dan konversi kolom kategorikal jika perlu, sebelum imputasi/scaling
+    # Asumsi: input_data sudah dalam format yang benar untuk imputer/scaler
+    # Jika ada kolom non-numerik, mereka harus di-handle sebelum imputasi/scaling
+    # Contoh: mengonversi string ke numerik sesuai mapping
+    
+    # Contoh sederhana untuk memastikan semua kolom numerik sebelum imputasi/scaling
+    # Anda mungkin perlu logika yang lebih kompleks jika ada banyak kolom kategorikal
+    # yang perlu di-encode sebelum scaling.
+    # Untuk contoh ini, kita asumsikan input_data sudah siap untuk imputer/scaler
+    
+    try:
+        input_imputed = imputer.transform(input_data)
+        input_scaled = scaler.transform(input_imputed)
+        input_processed = pd.DataFrame(input_scaled, columns=feature_names)
+    except Exception as e:
+        logger.error(f"Error during preprocessing: {e}")
+        return "Error: Preprocessing gagal."
     
     # Prediksi
     prediction = model.predict(input_processed)[0]
@@ -249,13 +340,16 @@ def create_gradio_interface():
             inputs=inputs_list,
             outputs=output_label,
             fn=wrapped_predict,
-            cache_examples=True)
+            cache_examples=False) # Set cache_examples to False to avoid potential caching issues during development
     return demo
 
-# --- 5. BLOK EKSEKUSI UTAMA ---
+# --- BLOK EKSEKUSI UTAMA (RESTRUKTURISASI) ---
 if __name__ == "__main__":
+    logger.info("Memulai aplikasi...")
+
+    # 1. Pemuatan Model Awal
     logger.info("Melakukan pemuatan model awal...")
-    initial_load_success, message = load_model_and_preprocessors() # Gunakan fungsi ini
+    initial_load_success, message = load_model_and_preprocessors()
     if not initial_load_success:
         logger.error(f"Gagal memuat model saat startup: {message}. Aplikasi akan berhenti.")
         sys.exit(1)
@@ -268,21 +362,39 @@ if __name__ == "__main__":
             model._run_id = latest_version.run_id
             logger.info(f"Model awal berhasil dimuat: versi {latest_version.version}, run_id {latest_version.run_id}")
 
+    # 2. Pemuatan Data Referensi untuk Drift Detection
+    data_dir = 'data'
+    old_file = os.path.join(data_dir, 'old_data.csv')
+    combined_file = os.path.join(data_dir, 'combined_data.csv')
 
-    def run_flask():
-        flask_app.run(host='0.0.0.0', port=8000)
+    if os.path.exists(combined_file):
+        REFERENCE_DATA = pd.read_csv(combined_file)
+        logger.info(f"Memuat data referensi dari {combined_file}. Jumlah baris: {len(REFERENCE_DATA)}")
+    elif os.path.exists(old_file):
+        REFERENCE_DATA = pd.read_csv(old_file)
+        logger.info(f"Memuat data referensi dari {old_file}. Jumlah baris: {len(REFERENCE_DATA)}")
+    else:
+        logger.error("Tidak dapat menemukan data referensi (combined_data.csv atau old_data.csv). Drift detection mungkin tidak berfungsi.")
+        REFERENCE_DATA = pd.DataFrame() # Inisialisasi kosong agar tidak error lebih lanjut
 
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
+    # 3. Inisialisasi dan Jalankan Threads
+    # Flask server untuk Prometheus
+    flask_thread = threading.Thread(target=lambda: flask_app.run(host='0.0.0.0', port=8000), daemon=True)
     flask_thread.start()
     logger.info("Flask server untuk Prometheus berjalan di port 8000.")
 
-    # Mulai thread untuk pengecekan update model
-    model_update_thread = threading.Thread(target=check_for_model_updates, args=(600,)) # Cek setiap 10 menit
-    model_update_thread.daemon = True
+    # Thread untuk pengecekan update model
+    model_update_thread = threading.Thread(target=check_for_model_updates, args=(600,), daemon=True) # Cek setiap 10 menit
     model_update_thread.start()
     logger.info("Thread pengecekan update model berjalan.")
 
+    # Thread untuk pengecekan data drift
+    data_drift_thread = threading.Thread(target=check_for_data_drift, args=(180,), daemon=True) # Cek setiap 3 menit
+    data_drift_thread.start()
+    logger.info("Thread pengecekan data drift berjalan.")
+
+    # 4. Menjalankan aplikasi Gradio
     logger.info("Menjalankan aplikasi Gradio...")
     demo = create_gradio_interface()
     demo.launch(server_name="0.0.0.0", server_port=7860)
+

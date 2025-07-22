@@ -17,6 +17,8 @@ COPY train.py .
 # COPY scaler.joblib .
 # COPY imputer.joblib .
 
+COPY data/ ./data/
+
 EXPOSE 7860
 
 CMD ["python", "app.py"]
