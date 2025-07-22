@@ -67,7 +67,7 @@ def load_model_and_preprocessors():
         return False, error_message
 
 # --- FUNGSI BARU: Pengecekan Model Berkala ---
-def check_for_model_updates(interval_seconds=600): # Cek setiap 10 menit (600 detik)
+def check_for_model_updates(interval_seconds=180): # detik
     global model, scaler, imputer
     MODEL_NAME = "HeartDiseaseClassifier"
     MODEL_STAGE = "Production"
