@@ -34,6 +34,7 @@ jobs:
             git push
           else
             echo "No new log file to commit."
+          fi
 
       - name: Run Training Script
         env:
