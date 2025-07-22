@@ -10,7 +10,7 @@ import joblib
 import os
 import sys
 import threading
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response
 from prometheus_client import Gauge, generate_latest, REGISTRY
 
 model = None
@@ -61,32 +61,6 @@ def load_model_and_preprocessors():
         # Jangan sys.exit(1) agar aplikasi tetap berjalan jika reload gagal
         return False, error_message
 
-# --- ENDPOINT BARU UNTUK RELOAD MODEL ---
-@flask_app.route("/reload", methods=["POST"])
-def reload_model_endpoint():
-    print("Menerima permintaan untuk me-reload model...")
-
-    # --- Validasi token dari header Authorization ---
-    expected_token = os.getenv("RELOAD_SECRET_TOKEN")
-    auth_header = request.headers.get("Authorization", "")
-    token_provided = auth_header.replace("Bearer ", "")
-
-    if not expected_token:
-        print("⚠️  Environment variable RELOAD_SECRET_TOKEN tidak diatur.")
-        return jsonify({"status": "error", "message": "Server misconfigured."}), 500
-
-    if token_provided != expected_token:
-        print("❌ Token tidak valid untuk reload.")
-        return jsonify({"status": "error", "message": "Unauthorized."}), 401
-
-    # --- Reload model ---
-    success, message = load_model_and_preprocessors()
-    if success:
-        print("✅ Model berhasil di-reload.")
-        return jsonify({"status": "success", "message": message}), 200
-    else:
-        print("❌ Gagal me-reload model.")
-        return jsonify({"status": "error", "message": message}), 500
 
 # --- 2. KONFIGURASI DAN PEMUATAN MODEL ---
 def setup_mlflow_tracking():

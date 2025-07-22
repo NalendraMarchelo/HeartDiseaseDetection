@@ -17,18 +17,6 @@ services:
     networks:
       - mlops-net
 
-  reloader:
-    image: python:3.9-slim
-    ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
-    working_dir: /app
-    environment:
-      - RELOAD_SECRET=${RELOAD_SECRET}
-    command: python reload_endpoint.py
-    restart: unless-stopped
-
   prometheus:
     image: prom/prometheus:latest
     ports:
